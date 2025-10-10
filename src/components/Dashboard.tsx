@@ -226,19 +226,21 @@ const Dashboard: React.FC = () => {
                     fontWeight: 'bold'
                   }}
                 />
-                <Button
-                  size="small"
-                  color="inherit"
-                  onClick={refreshKioskConfig}
-                  startIcon={<RefreshIcon />}
-                  sx={{ 
-                    color: 'rgba(255,255,255,0.7)',
-                    minWidth: 'auto',
-                    fontSize: '0.75rem'
-                  }}
-                >
-                  Refresh
-                </Button>
+                {user?.role?.toLowerCase() === 'admin' && (
+                  <Button
+                    size="small"
+                    color="inherit"
+                    onClick={refreshKioskConfig}
+                    startIcon={<RefreshIcon />}
+                    sx={{ 
+                      color: 'rgba(255,255,255,0.7)',
+                      minWidth: 'auto',
+                      fontSize: '0.75rem'
+                    }}
+                  >
+                    Refresh
+                  </Button>
+                )}
                 {user?.role?.toLowerCase() === 'admin' && (
                   <Button
                     size="small"

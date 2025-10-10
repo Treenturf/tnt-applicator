@@ -149,12 +149,8 @@ const Calculator: React.FC = () => {
     } else if (truckType === 'hose' || truckType === 'cart') {
       setMode('tnt');
       loadDefaultApplication();
-      // Auto-open keypad: front tank for hose, single input for cart
-      if (truckType === 'hose') {
-        setActiveInput('frontTank');
-      } else {
-        setActiveInput('thousandSqFt');
-      }
+      // Auto-open keypad: front tank (driver tank for cart, front tank for hose)
+      setActiveInput('frontTank');
     } else {
       setProducts([]);
       setMode('fertilizer');
@@ -268,13 +264,14 @@ const Calculator: React.FC = () => {
         results.push(result);
       });
     } else {
-      // Cart truck: single tank calculation for each product
-      if (thousandSqFt <= 0) return;
+      // Cart truck: dual tank calculation for each product (driver and passenger tanks)
+      if (frontTank <= 0 && backTank <= 0) return;
       
       // Calculate for each product in the application recipe
       defaultApplication.products.forEach((appProduct: any) => {
         const rate = appProduct.cartRate || 0;
-        const ouncesNeeded = thousandSqFt * rate;
+        const driverTankOunces = frontTank * rate;
+        const passengerTankOunces = backTank * rate;
         
         const result: CalculationResult = {
           product: {
@@ -288,8 +285,12 @@ const Calculator: React.FC = () => {
             unit: appProduct.unit || 'ounces',
             isActive: true
           },
-          gallons: thousandSqFt,
-          ouncesNeeded,
+          gallons: frontTank + backTank,
+          frontTankGallons: frontTank,
+          backTankGallons: backTank,
+          frontTankOunces: driverTankOunces,
+          backTankOunces: passengerTankOunces,
+          ouncesNeeded: driverTankOunces + passengerTankOunces,
           tankSelection: 'cart'
         };
         results.push(result);
@@ -398,9 +399,21 @@ const Calculator: React.FC = () => {
     ];
 
     let label = 'Enter 1000 Square Feet';
-    if (activeInput === 'frontTank') label = 'Enter Front Tank Gallons';
-    else if (activeInput === 'backTank') label = 'Enter Back Tank Gallons';
-    else if (mode === 'tnt') label = 'Enter Gallons';
+    if (activeInput === 'frontTank') {
+      if (truckType === 'cart') {
+        label = 'Enter Driver Tank Gallons';
+      } else {
+        label = 'Enter Front Tank Gallons';
+      }
+    } else if (activeInput === 'backTank') {
+      if (truckType === 'cart') {
+        label = 'Enter Passenger Tank Gallons';
+      } else {
+        label = 'Enter Back Tank Gallons';
+      }
+    } else if (mode === 'tnt') {
+      label = 'Enter Gallons';
+    }
 
     return (
       <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
@@ -580,24 +593,50 @@ const Calculator: React.FC = () => {
                   </>
                 )}
                 {mode === 'tnt' && truckType === 'cart' && (
-                  <TextField
-                    fullWidth
-                    label="Gallons to Spray"
-                    value={thousandSqFt || ''}
-                    onClick={() => setActiveInput('thousandSqFt')}
-                    InputProps={{
-                      readOnly: true,
-                      style: { cursor: 'pointer', fontSize: '1.2rem', textAlign: 'center' }
-                    }}
-                    sx={{
-                      mb: 3,
-                      '& .MuiOutlinedInput-root': {
-                        '&:hover': {
-                          backgroundColor: 'action.hover'
-                        }
-                      }
-                    }}
-                  />
+                  <>
+                    <Grid container spacing={2}>
+                      <Grid item xs={6}>
+                        <TextField
+                          fullWidth
+                          label="Driver Tank (gallons)"
+                          value={frontTank || ''}
+                          onClick={() => setActiveInput('frontTank')}
+                          InputProps={{
+                            readOnly: true,
+                            style: { cursor: 'pointer', fontSize: '1.2rem', textAlign: 'center' }
+                          }}
+                          sx={{
+                            mb: 3,
+                            '& .MuiOutlinedInput-root': {
+                              '&:hover': {
+                                backgroundColor: 'action.hover'
+                              }
+                            }
+                          }}
+                        />
+                      </Grid>
+                      <Grid item xs={6}>
+                        <TextField
+                          fullWidth
+                          label="Passenger Tank (gallons)"
+                          value={backTank || ''}
+                          onClick={() => setActiveInput('backTank')}
+                          InputProps={{
+                            readOnly: true,
+                            style: { cursor: 'pointer', fontSize: '1.2rem', textAlign: 'center' }
+                          }}
+                          sx={{
+                            mb: 3,
+                            '& .MuiOutlinedInput-root': {
+                              '&:hover': {
+                                backgroundColor: 'action.hover'
+                              }
+                            }
+                          }}
+                        />
+                      </Grid>
+                    </Grid>
+                  </>
                 )}
 
                 {/* Keypad */}
@@ -624,7 +663,7 @@ const Calculator: React.FC = () => {
                     onClick={handleTntCalculate}
                     disabled={
                       !defaultApplication || 
-                      (truckType === 'hose' ? (frontTank <= 0 && backTank <= 0) : thousandSqFt <= 0)
+                      (frontTank <= 0 && backTank <= 0)
                     }
                     startIcon={<CalculateIcon />}
                     sx={{ mt: 2 }}
@@ -664,17 +703,17 @@ const Calculator: React.FC = () => {
                         </>
                       ) : (
                         <>
-                          {truckType === 'hose' && calc.frontTankGallons !== undefined && calc.backTankGallons !== undefined ? (
+                          {calc.frontTankGallons !== undefined && calc.backTankGallons !== undefined ? (
                             <>
                               <Typography variant="body1" sx={{ fontWeight: 'bold', mb: 1 }}>
-                                Front Tank: {calc.frontTankGallons} gallons
+                                {truckType === 'cart' ? 'Driver Tank' : 'Front Tank'}: {calc.frontTankGallons} gallons
                               </Typography>
                               <Typography variant="h6" color="primary" sx={{ ml: 2, mb: 2 }}>
                                 {calc.frontTankOunces?.toFixed(2)} oz
                               </Typography>
                               
                               <Typography variant="body1" sx={{ fontWeight: 'bold', mb: 1 }}>
-                                Back Tank: {calc.backTankGallons} gallons
+                                {truckType === 'cart' ? 'Passenger Tank' : 'Back Tank'}: {calc.backTankGallons} gallons
                               </Typography>
                               <Typography variant="h6" color="primary" sx={{ ml: 2 }}>
                                 {calc.backTankOunces?.toFixed(2)} oz

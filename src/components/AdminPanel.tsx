@@ -60,6 +60,7 @@ const AdminPanel: React.FC = () => {
   const [openKioskDialog, setOpenKioskDialog] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
   const [editingKiosk, setEditingKiosk] = useState<any>(null);
+  const [isAddingKiosk, setIsAddingKiosk] = useState(false);
   
   // Form states
   const [newUser, setNewUser] = useState({
@@ -117,7 +118,21 @@ const AdminPanel: React.FC = () => {
       title: 'Kiosk Management', 
       description: 'Configure kiosk settings and product assignments',
       icon: <Typography sx={{ fontSize: 40 }}>🖥️</Typography>,
-      action: () => setOpenKioskDialog(true),
+      action: () => {
+        setEditingKiosk(null);
+        setIsAddingKiosk(false);
+        setNewKiosk({
+          name: '',
+          type: 'specialty',
+          description: '',
+          availableProducts: [],
+          defaultTruckTypes: [],
+          calculationMode: 'both',
+          units: { primary: 'gallons' },
+          location: ''
+        });
+        setOpenKioskDialog(true);
+      },
       color: 'secondary.main'
     }
   ];
@@ -167,14 +182,20 @@ const AdminPanel: React.FC = () => {
 
   const loadKiosks = async () => {
     try {
+      console.log('🖥️ AdminPanel: Loading kiosks...');
       const kiosksSnapshot = await getDocs(collection(db, 'kiosks'));
+      console.log('📦 AdminPanel: Kiosks snapshot size:', kiosksSnapshot.size);
+      
       const kiosksData = kiosksSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }));
+      console.log('🖥️ AdminPanel: Mapped kiosks:', kiosksData);
+      
       setKiosks(kiosksData);
+      console.log('💾 AdminPanel: Set kiosks state with', kiosksData.length, 'kiosks');
     } catch (error) {
-      console.error('Error loading kiosks:', error);
+      console.error('❌ AdminPanel: Error loading kiosks:', error);
       setMessage('Error loading kiosks');
     }
   };
@@ -232,6 +253,7 @@ const AdminPanel: React.FC = () => {
 
       setOpenKioskDialog(false);
       setEditingKiosk(null);
+      setIsAddingKiosk(false);
       setNewKiosk({
         name: '',
         type: 'specialty',
@@ -253,6 +275,7 @@ const AdminPanel: React.FC = () => {
 
   const handleEditKiosk = (kiosk: any) => {
     setEditingKiosk(kiosk);
+    setIsAddingKiosk(false);
     setNewKiosk({
       name: kiosk.name || '',
       type: kiosk.type || 'specialty',
@@ -359,50 +382,59 @@ const AdminPanel: React.FC = () => {
         <DialogContent dividers>
           {/* Existing Kiosks */}
           <Typography variant="h6" gutterBottom>
-            Existing Kiosks
+            Existing Kiosks ({kiosks.length})
           </Typography>
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            {kiosks.map((kiosk) => (
-              <Grid item xs={12} key={kiosk.id}>
-                <Card sx={{ mb: 2, border: currentKiosk?.id === kiosk.id ? '2px solid' : '1px solid', borderColor: currentKiosk?.id === kiosk.id ? 'primary.main' : 'grey.300' }}>
-                  <CardContent>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                      <Box sx={{ flexGrow: 1 }}>
-                        <Typography variant="h6">
-                          {kiosk.name}
-                          {currentKiosk?.id === kiosk.id && (
-                            <Chip label="Current" color="primary" size="small" sx={{ ml: 1 }} />
-                          )}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" gutterBottom>
-                          Type: {kiosk.type} • 
-                          Products: {kiosk.availableProducts?.length || 0} • 
-                          Location: {kiosk.location || 'Not specified'}
-                        </Typography>
-                        <Typography variant="body2">
-                          {kiosk.description}
-                        </Typography>
+          {kiosks.length === 0 ? (
+            <Box sx={{ p: 3, textAlign: 'center', bgcolor: 'grey.50', borderRadius: 1, mb: 3 }}>
+              <Typography variant="body1" color="text.secondary">
+                No kiosks found. Click "Add New Kiosk" to create your first kiosk.
+              </Typography>
+            </Box>
+          ) : (
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+              {kiosks.map((kiosk) => (
+                <Grid item xs={12} key={kiosk.id}>
+                  <Card sx={{ mb: 2, border: currentKiosk?.id === kiosk.id ? '2px solid' : '1px solid', borderColor: currentKiosk?.id === kiosk.id ? 'primary.main' : 'grey.300' }}>
+                    <CardContent>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                        <Box sx={{ flexGrow: 1 }}>
+                          <Typography variant="h6">
+                            {kiosk.name}
+                            {currentKiosk?.id === kiosk.id && (
+                              <Chip label="Current" color="primary" size="small" sx={{ ml: 1 }} />
+                            )}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary" gutterBottom>
+                            Type: {kiosk.type} • 
+                            Products: {kiosk.availableProducts?.length || 0} • 
+                            Location: {kiosk.location || 'Not specified'}
+                          </Typography>
+                          <Typography variant="body2">
+                            {kiosk.description}
+                          </Typography>
+                        </Box>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          startIcon={<EditIcon />}
+                          onClick={() => handleEditKiosk(kiosk)}
+                        >
+                          Edit
+                        </Button>
                       </Box>
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        startIcon={<EditIcon />}
-                        onClick={() => handleEditKiosk(kiosk)}
-                      >
-                        Edit
-                      </Button>
-                    </Box>
-                  </CardContent>
-                </Card>
-              </Grid>
-            ))}
-          </Grid>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          )}
 
           <Button
             variant="contained"
             startIcon={<AddIcon />}
             onClick={() => {
               setEditingKiosk(null);
+              setIsAddingKiosk(true);
               setNewKiosk({
                 name: '',
                 type: 'specialty',
@@ -420,7 +452,7 @@ const AdminPanel: React.FC = () => {
           </Button>
 
           {/* Kiosk Form */}
-          {(editingKiosk || newKiosk.name) && (
+          {(editingKiosk || isAddingKiosk) && (
             <Box sx={{ border: '1px solid', borderColor: 'grey.300', borderRadius: 1, p: 2 }}>
               <Typography variant="h6" gutterBottom>
                 {editingKiosk ? 'Edit Kiosk' : 'Add New Kiosk'}
