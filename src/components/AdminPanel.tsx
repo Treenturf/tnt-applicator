@@ -672,6 +672,7 @@ const AdminPanel: React.FC = () => {
                 onClick={() => {
                   setEditingUser(null);
                   setNewUser({ name: '', userCode: '', role: 'applicator', email: '', isActive: true });
+                  setOpenUserDialog(false);
                 }}
               >
                 Cancel

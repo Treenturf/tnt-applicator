@@ -7,6 +7,7 @@ import { KioskProvider, useKiosk } from './contexts/KioskContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import DatabaseErrorBoundary from './components/DatabaseErrorBoundary';
 import KioskSelector from './components/KioskSelector';
+import KioskConfigWrapper from './components/KioskConfigWrapper';
 import LoginPage from './components/LoginPage.tsx';
 import Dashboard from './components/Dashboard.tsx';
 import AdminPanel from './components/AdminPanel.tsx';
@@ -58,37 +59,15 @@ const ProtectedRoute: React.FC<{
 };
 
 const AppContent: React.FC = () => {
-  const { isKioskConfigured, isLoading, currentKiosk } = useKiosk();
-
-  console.log('🖥️ AppContent render:', { isKioskConfigured, isLoading, currentKioskId: currentKiosk?.id });
-
-  // Show loading while determining kiosk configuration
-  if (isLoading) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" height="100vh">
-        <CircularProgress />
-      </Box>
-    );
-  }
-
-  // Show kiosk selector if not configured
-  if (!isKioskConfigured) {
-    console.log('🏭 Showing kiosk selector');
-    return <KioskSelector onKioskSelected={(kioskId) => {
-      console.log('🏭 Kiosk selected:', kioskId);
-      // The kiosk context should handle the configuration
-    }} />;
-  }
-
-  console.log('🚀 Kiosk configured, showing main app with current kiosk:', currentKiosk?.name);
-
   return (
     <Router>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/dashboard" element={
           <ProtectedRoute>
-            <Dashboard />
+            <KioskConfigWrapper>
+              <Dashboard />
+            </KioskConfigWrapper>
           </ProtectedRoute>
         } />
         <Route path="/calculator" element={
@@ -159,7 +138,7 @@ const AppContent: React.FC = () => {
             </ErrorBoundary>
           </ProtectedRoute>
         } />
-        <Route path="/" element={<Navigate to="/dashboard" />} />
+  <Route path="/" element={<Navigate to="/login" />} />
       </Routes>
     </Router>
   );

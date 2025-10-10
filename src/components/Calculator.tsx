@@ -10,7 +10,8 @@ import {
   Toolbar,
   TextField,
   Grid,
-  MenuItem
+  MenuItem,
+  Divider
 } from '@mui/material';
 import { 
   ArrowBack as BackIcon,
@@ -48,6 +49,10 @@ interface Product {
 interface CalculationResult {
   product: Product;
   gallons?: number;
+  frontTankGallons?: number;
+  backTankGallons?: number;
+  frontTankOunces?: number;
+  backTankOunces?: number;
   acres?: number;
   squareFeet?: number;
   totalAmount?: number;
@@ -59,25 +64,6 @@ interface CalculationResult {
 }
 
 const Calculator: React.FC = () => {
-  // TNT calculation logic
-  const handleTntCalculate = () => {
-    if (!selectedProduct || thousandSqFt <= 0) {
-      return;
-    }
-    const product = products.find(p => p.id === selectedProduct);
-    if (!product) return;
-    // For TNT: thousandSqFt is used as gallons
-    const gallons = thousandSqFt;
-    const rate = truckType === 'hose' ? product.hoseRatePerGallon : product.cartRatePerGallon;
-    const ouncesNeeded = gallons * rate;
-    const result: CalculationResult = {
-      product,
-      gallons,
-      ouncesNeeded,
-      tankSelection: truckType || ''
-    };
-    setCalculations([result]);
-  };
   const { user, logout } = useAuth();
   const { currentKiosk } = useKiosk();
   const navigate = useNavigate();
@@ -88,9 +74,13 @@ const Calculator: React.FC = () => {
   
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<string>('');
+  const [defaultApplication, setDefaultApplication] = useState<any>(null);
   const [thousandSqFt, setThousandSqFt] = useState<number>(0);
+  const [frontTank, setFrontTank] = useState<number>(0);
+  const [backTank, setBackTank] = useState<number>(0);
   const [calculations, setCalculations] = useState<CalculationResult[]>([]);
-  const [activeInput, setActiveInput] = useState<'thousandSqFt' | null>(null);
+  const [activeInput, setActiveInput] = useState<'thousandSqFt' | 'frontTank' | 'backTank' | null>(null);
+  const [mode, setMode] = useState<'fertilizer' | 'tnt'>('fertilizer');
 
   // Sample fertilizer products for testing
   const sampleProducts: Product[] = [
@@ -155,33 +145,40 @@ const Calculator: React.FC = () => {
     if (preSelectedFertilizer) {
       setProducts(sampleProducts);
       setMode('fertilizer');
+      setActiveInput('thousandSqFt'); // Auto-open keypad for fertilizer
     } else if (truckType === 'hose' || truckType === 'cart') {
       setMode('tnt');
-      loadLiquidProducts();
+      loadDefaultApplication();
+      // Auto-open keypad: front tank for hose, single input for cart
+      if (truckType === 'hose') {
+        setActiveInput('frontTank');
+      } else {
+        setActiveInput('thousandSqFt');
+      }
     } else {
       setProducts([]);
       setMode('fertilizer');
     }
   }, [preSelectedFertilizer, truckType]);
 
-  const [mode, setMode] = useState<'fertilizer' | 'tnt'>('fertilizer');
-
-  const loadLiquidProducts = async () => {
+  const loadDefaultApplication = async () => {
     try {
-      const productsSnapshot = await getDocs(collection(db, 'products'));
-      const productsData = productsSnapshot.docs.map(doc => ({
+      const applicationsSnapshot = await getDocs(collection(db, 'applications'));
+      const applicationsData = applicationsSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      })) as Product[];
-      // Only show active, non-fertilizer products with a rate for the selected truck
-      const liquidProducts = productsData.filter(p =>
-        p.isActive &&
-        p.type !== 'fertilizer' &&
-        ((truckType === 'hose' && p.hoseRatePerGallon > 0) || (truckType === 'cart' && p.cartRatePerGallon > 0))
-      );
-      setProducts(liquidProducts);
+      })) as any[];
+      
+      // Find the default application
+      const defaultApp = applicationsData.find(app => app.isDefault && app.isActive);
+      
+      if (defaultApp) {
+        setDefaultApplication(defaultApp);
+      } else {
+        console.warn('No default application recipe found. Admin needs to set one.');
+      }
     } catch (error) {
-      console.error('Error loading liquid products:', error);
+      console.error('Error loading default application:', error);
     }
   };
 
@@ -229,6 +226,79 @@ const Calculator: React.FC = () => {
     setCalculations([result]);
   };
 
+  // TNT calculation logic for hose/cart trucks using default application
+  const handleTntCalculate = () => {
+    if (!defaultApplication || !defaultApplication.products || defaultApplication.products.length === 0) {
+      console.warn('No default application or products found');
+      return;
+    }
+
+    const results: CalculationResult[] = [];
+
+    if (truckType === 'hose') {
+      // Hose truck: calculate for both tanks separately for each product
+      if (frontTank <= 0 && backTank <= 0) return;
+      
+      // Calculate for each product in the application recipe
+      defaultApplication.products.forEach((appProduct: any) => {
+        const rate = appProduct.hoseRate || 0;
+        const frontTankOunces = frontTank * rate;
+        const backTankOunces = backTank * rate;
+        
+        const result: CalculationResult = {
+          product: {
+            id: appProduct.productId,
+            name: appProduct.productName,
+            type: appProduct.productType || 'herbicide',
+            hoseRatePerGallon: rate,
+            cartRatePerGallon: appProduct.cartRate || 0,
+            poundsPer1000SqFt: 0,
+            poundsPerBag: 0,
+            unit: appProduct.unit || 'ounces',
+            isActive: true
+          },
+          gallons: frontTank + backTank,
+          frontTankGallons: frontTank,
+          backTankGallons: backTank,
+          frontTankOunces: frontTankOunces,
+          backTankOunces: backTankOunces,
+          ouncesNeeded: frontTankOunces + backTankOunces,
+          tankSelection: 'hose'
+        };
+        results.push(result);
+      });
+    } else {
+      // Cart truck: single tank calculation for each product
+      if (thousandSqFt <= 0) return;
+      
+      // Calculate for each product in the application recipe
+      defaultApplication.products.forEach((appProduct: any) => {
+        const rate = appProduct.cartRate || 0;
+        const ouncesNeeded = thousandSqFt * rate;
+        
+        const result: CalculationResult = {
+          product: {
+            id: appProduct.productId,
+            name: appProduct.productName,
+            type: appProduct.productType || 'herbicide',
+            hoseRatePerGallon: appProduct.hoseRate || 0,
+            cartRatePerGallon: rate,
+            poundsPer1000SqFt: 0,
+            poundsPerBag: 0,
+            unit: appProduct.unit || 'ounces',
+            isActive: true
+          },
+          gallons: thousandSqFt,
+          ouncesNeeded,
+          tankSelection: 'cart'
+        };
+        results.push(result);
+      });
+    }
+    
+    setCalculations(results);
+  };
+
   const handleLogOut = async () => {
     try {
       if (calculations.length > 0) {
@@ -266,19 +336,38 @@ const Calculator: React.FC = () => {
     if (!activeInput) return;
 
     if (value === 'clear') {
-      setThousandSqFt(0);
+      if (activeInput === 'frontTank') setFrontTank(0);
+      else if (activeInput === 'backTank') setBackTank(0);
+      else setThousandSqFt(0);
       return;
     }
 
     if (value === 'backspace') {
-      const current = thousandSqFt.toString();
-      const newValue = current.slice(0, -1);
-      setThousandSqFt(newValue ? parseFloat(newValue) : 0);
+      if (activeInput === 'frontTank') {
+        const current = frontTank.toString();
+        const newValue = current.slice(0, -1);
+        setFrontTank(newValue ? parseFloat(newValue) : 0);
+      } else if (activeInput === 'backTank') {
+        const current = backTank.toString();
+        const newValue = current.slice(0, -1);
+        setBackTank(newValue ? parseFloat(newValue) : 0);
+      } else {
+        const current = thousandSqFt.toString();
+        const newValue = current.slice(0, -1);
+        setThousandSqFt(newValue ? parseFloat(newValue) : 0);
+      }
       return;
     }
 
     // Handle number and decimal input
-    const currentStr = thousandSqFt === 0 ? '' : thousandSqFt.toString();
+    let currentStr = '';
+    if (activeInput === 'frontTank') {
+      currentStr = frontTank === 0 ? '' : frontTank.toString();
+    } else if (activeInput === 'backTank') {
+      currentStr = backTank === 0 ? '' : backTank.toString();
+    } else {
+      currentStr = thousandSqFt === 0 ? '' : thousandSqFt.toString();
+    }
     
     // Prevent multiple decimal points
     if (value === '.' && currentStr.includes('.')) return;
@@ -287,7 +376,13 @@ const Calculator: React.FC = () => {
     const newValue = parseFloat(newValueStr);
     
     if (!isNaN(newValue) && newValue >= 0) {
-      setThousandSqFt(newValue);
+      if (activeInput === 'frontTank') {
+        setFrontTank(newValue);
+      } else if (activeInput === 'backTank') {
+        setBackTank(newValue);
+      } else {
+        setThousandSqFt(newValue);
+      }
     }
   };
 
@@ -302,10 +397,15 @@ const Calculator: React.FC = () => {
       ['backspace']
     ];
 
+    let label = 'Enter 1000 Square Feet';
+    if (activeInput === 'frontTank') label = 'Enter Front Tank Gallons';
+    else if (activeInput === 'backTank') label = 'Enter Back Tank Gallons';
+    else if (mode === 'tnt') label = 'Enter Gallons';
+
     return (
       <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
         <Typography variant="h5" fontWeight="bold" sx={{ mb: 2, textAlign: 'center' }}>
-          Enter 1000 Square Feet
+          {label}
         </Typography>
         {keys.map((row, rowIndex) => (
           <Grid container spacing={1} key={rowIndex} sx={{ mb: 1 }}>
@@ -398,21 +498,19 @@ const Calculator: React.FC = () => {
                     ))}
                   </TextField>
                 )}
-                {mode === 'tnt' && (
-                  <TextField
-                    select
-                    fullWidth
-                    label={`Select Product (${truckType === 'hose' ? 'Hose' : 'Cart'} Truck)`}
-                    value={selectedProduct}
-                    onChange={(e) => setSelectedProduct(e.target.value)}
-                    sx={{ mb: 3 }}
-                  >
-                    {products.map((product) => (
-                      <MenuItem key={product.id} value={product.id}>
-                        {product.name} - {truckType === 'hose' ? product.hoseRatePerGallon : product.cartRatePerGallon} oz/gal
-                      </MenuItem>
-                    ))}
-                  </TextField>
+
+                {/* Display default application name for TNT mode */}
+                {mode === 'tnt' && defaultApplication && (
+                  <Box sx={{ mb: 3, p: 2, bgcolor: 'primary.light', borderRadius: 1, color: 'primary.contrastText' }}>
+                    <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 1 }}>
+                      {defaultApplication.name}
+                    </Typography>
+                    {defaultApplication.description && (
+                      <Typography variant="body2">
+                        {defaultApplication.description}
+                      </Typography>
+                    )}
+                  </Box>
                 )}
 
                 {/* 1000 Square Feet Input (fertilizer) or Gallons Input (TNT) */}
@@ -436,7 +534,52 @@ const Calculator: React.FC = () => {
                     }}
                   />
                 )}
-                {mode === 'tnt' && (
+                {/* Tank Inputs - Different for hose vs cart */}
+                {mode === 'tnt' && truckType === 'hose' && (
+                  <>
+                    <Grid container spacing={2} sx={{ mb: 3 }}>
+                      <Grid item xs={6}>
+                        <TextField
+                          fullWidth
+                          label="Front Tank (Gallons)"
+                          value={frontTank || ''}
+                          onClick={() => setActiveInput('frontTank')}
+                          InputProps={{
+                            readOnly: true,
+                            style: { cursor: 'pointer', fontSize: '1.2rem', textAlign: 'center' }
+                          }}
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              '&:hover': {
+                                backgroundColor: 'action.hover'
+                              }
+                            }
+                          }}
+                        />
+                      </Grid>
+                      <Grid item xs={6}>
+                        <TextField
+                          fullWidth
+                          label="Back Tank (Gallons)"
+                          value={backTank || ''}
+                          onClick={() => setActiveInput('backTank')}
+                          InputProps={{
+                            readOnly: true,
+                            style: { cursor: 'pointer', fontSize: '1.2rem', textAlign: 'center' }
+                          }}
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              '&:hover': {
+                                backgroundColor: 'action.hover'
+                              }
+                            }
+                          }}
+                        />
+                      </Grid>
+                    </Grid>
+                  </>
+                )}
+                {mode === 'tnt' && truckType === 'cart' && (
                   <TextField
                     fullWidth
                     label="Gallons to Spray"
@@ -479,7 +622,10 @@ const Calculator: React.FC = () => {
                     variant="contained" 
                     size="large"
                     onClick={handleTntCalculate}
-                    disabled={!selectedProduct || thousandSqFt <= 0}
+                    disabled={
+                      !defaultApplication || 
+                      (truckType === 'hose' ? (frontTank <= 0 && backTank <= 0) : thousandSqFt <= 0)
+                    }
                     startIcon={<CalculateIcon />}
                     sx={{ mt: 2 }}
                   >
@@ -518,15 +664,40 @@ const Calculator: React.FC = () => {
                         </>
                       ) : (
                         <>
-                          <Typography variant="body1">
-                            Gallons: {calc.gallons}
-                          </Typography>
-                          <Typography variant="h5" color="primary" sx={{ my: 1 }}>
-                            {calc.ouncesNeeded?.toFixed(2)} oz needed
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            Rate: {truckType === 'hose' ? calc.product.hoseRatePerGallon : calc.product.cartRatePerGallon} oz/gal
-                          </Typography>
+                          {truckType === 'hose' && calc.frontTankGallons !== undefined && calc.backTankGallons !== undefined ? (
+                            <>
+                              <Typography variant="body1" sx={{ fontWeight: 'bold', mb: 1 }}>
+                                Front Tank: {calc.frontTankGallons} gallons
+                              </Typography>
+                              <Typography variant="h6" color="primary" sx={{ ml: 2, mb: 2 }}>
+                                {calc.frontTankOunces?.toFixed(2)} oz
+                              </Typography>
+                              
+                              <Typography variant="body1" sx={{ fontWeight: 'bold', mb: 1 }}>
+                                Back Tank: {calc.backTankGallons} gallons
+                              </Typography>
+                              <Typography variant="h6" color="primary" sx={{ ml: 2 }}>
+                                {calc.backTankOunces?.toFixed(2)} oz
+                              </Typography>
+                              
+                              <Divider sx={{ my: 2 }} />
+                              <Typography variant="h5" color="primary" sx={{ textAlign: 'center' }}>
+                                Total: {calc.ouncesNeeded?.toFixed(2)} oz
+                              </Typography>
+                            </>
+                          ) : (
+                            <>
+                              <Typography variant="body1">
+                                Gallons: {calc.gallons}
+                              </Typography>
+                              <Typography variant="h5" color="primary" sx={{ my: 1 }}>
+                                {calc.ouncesNeeded?.toFixed(2)} oz needed
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                Rate: {calc.product.cartRatePerGallon} oz/gal
+                              </Typography>
+                            </>
+                          )}
                         </>
                       )}
                     </Box>
