@@ -1,0 +1,699 @@
+import React, { useState, useEffect } from 'react';
+import {
+  Container,
+  Typography,
+  Box,
+  Card,
+  CardContent,
+  Grid,
+  Button,
+  AppBar,
+  Toolbar,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Chip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Alert,
+  Snackbar,
+  IconButton,
+  FormControlLabel,
+  Checkbox
+} from '@mui/material';
+import {
+  Add as AddIcon,
+  Edit as EditIcon,
+  Close as CloseIcon,
+  AdminPanelSettings as AdminIcon
+} from '@mui/icons-material';
+import { useAuth } from '../contexts/AuthContext';
+import { useKiosk } from '../contexts/KioskContext';
+import { useNavigate } from 'react-router-dom';
+import { collection, getDocs, addDoc, updateDoc, doc } from 'firebase/firestore';
+import { db } from '../firebase';
+
+const AdminPanel: React.FC = () => {
+  const { user, logout } = useAuth();
+  const { currentKiosk } = useKiosk();
+  const navigate = useNavigate();
+
+  // State management
+  const [users, setUsers] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [kiosks, setKiosks] = useState<any[]>([]);
+  const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(false);
+  
+  // Dialog states
+  const [openUserDialog, setOpenUserDialog] = useState(false);
+  const [openKioskDialog, setOpenKioskDialog] = useState(false);
+  const [editingUser, setEditingUser] = useState<any>(null);
+  const [editingKiosk, setEditingKiosk] = useState<any>(null);
+  
+  // Form states
+  const [newUser, setNewUser] = useState({
+    name: '',
+    userCode: '',
+    role: 'applicator',
+    email: '',
+    isActive: true
+  });
+  
+  const [newKiosk, setNewKiosk] = useState<{
+    name: string;
+    type: string;
+    description: string;
+    availableProducts: string[];
+    defaultTruckTypes: string[];
+    calculationMode: string;
+    units: { primary: string };
+    location: string;
+  }>({
+    name: '',
+    type: 'specialty',
+    description: '',
+    availableProducts: [],
+    defaultTruckTypes: [],
+    calculationMode: 'both',
+    units: { primary: 'gallons' },
+    location: ''
+  });
+
+  // Navigation items
+  const navigationItems = [
+    {
+      title: 'User Management',
+      description: 'Manage applicators and administrators',
+      icon: <AdminIcon sx={{ fontSize: 40 }} />,
+      action: () => setOpenUserDialog(true),
+      color: 'primary.main'
+    },
+    {
+      title: 'Product Management', 
+      description: 'Add and manage products',
+      icon: <Typography sx={{ fontSize: 40 }}>📦</Typography>,
+      action: () => navigate('/admin/products'),
+      color: 'success.main'
+    },
+    {
+      title: 'Application Recipes', 
+      description: 'Create and manage application recipes',
+      icon: <Typography sx={{ fontSize: 40 }}>🧪</Typography>,
+      action: () => navigate('/admin/applications'),
+      color: 'warning.main'
+    },
+    {
+      title: 'Kiosk Management', 
+      description: 'Configure kiosk settings and product assignments',
+      icon: <Typography sx={{ fontSize: 40 }}>🖥️</Typography>,
+      action: () => setOpenKioskDialog(true),
+      color: 'secondary.main'
+    }
+  ];
+
+  useEffect(() => {
+    loadUsers();
+    loadProducts();
+    loadKiosks();
+  }, []);
+
+  const loadUsers = async () => {
+    try {
+      const usersSnapshot = await getDocs(collection(db, 'users'));
+      const usersData = usersSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setUsers(usersData);
+    } catch (error) {
+      console.error('Error loading users:', error);
+      setMessage('Error loading users');
+    }
+  };
+
+  const loadProducts = async () => {
+    try {
+      console.log('🔍 AdminPanel: Loading products from Firebase...');
+      const productsSnapshot = await getDocs(collection(db, 'products'));
+      console.log('📊 AdminPanel: Got snapshot with', productsSnapshot.docs.length, 'documents');
+      
+      const productsData = productsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      console.log('📦 AdminPanel: Mapped products:', productsData);
+      
+      const activeProducts = productsData.filter((p: any) => p.isActive);
+      console.log('✅ AdminPanel: Active products:', activeProducts);
+      
+      setProducts(activeProducts);
+      console.log('💾 AdminPanel: Set products state with', activeProducts.length, 'products');
+    } catch (error) {
+      console.error('❌ AdminPanel: Error loading products:', error);
+      setMessage('Error loading products');
+    }
+  };
+
+  const loadKiosks = async () => {
+    try {
+      const kiosksSnapshot = await getDocs(collection(db, 'kiosks'));
+      const kiosksData = kiosksSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setKiosks(kiosksData);
+    } catch (error) {
+      console.error('Error loading kiosks:', error);
+      setMessage('Error loading kiosks');
+    }
+  };
+
+  const handleSaveUser = async () => {
+    try {
+      setLoading(true);
+      const userToSave = {
+        ...newUser,
+        userCode: newUser.userCode.toUpperCase(),
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      if (editingUser) {
+        await updateDoc(doc(db, 'users', editingUser.id), userToSave);
+        setMessage(`User "${userToSave.name}" updated successfully!`);
+      } else {
+        await addDoc(collection(db, 'users'), userToSave);
+        setMessage(`User "${userToSave.name}" created successfully!`);
+      }
+
+      setOpenUserDialog(false);
+      setEditingUser(null);
+      setNewUser({ name: '', userCode: '', role: 'applicator', email: '', isActive: true });
+      loadUsers();
+    } catch (error) {
+      console.error('Error saving user:', error);
+      setMessage('Error saving user');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveKiosk = async () => {
+    try {
+      setLoading(true);
+      
+      if (editingKiosk) {
+        const kioskToSave = {
+          ...newKiosk,
+          updatedAt: new Date()
+        };
+        await updateDoc(doc(db, 'kiosks', editingKiosk.id), kioskToSave);
+        setMessage(`Kiosk "${kioskToSave.name}" updated successfully! Products assigned: ${kioskToSave.availableProducts.length}`);
+      } else {
+        const kioskToSave = {
+          ...newKiosk,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+        await addDoc(collection(db, 'kiosks'), kioskToSave);
+        setMessage(`Kiosk "${kioskToSave.name}" created successfully! Products assigned: ${kioskToSave.availableProducts.length}`);
+      }
+
+      setOpenKioskDialog(false);
+      setEditingKiosk(null);
+      setNewKiosk({
+        name: '',
+        type: 'specialty',
+        description: '',
+        availableProducts: [],
+        defaultTruckTypes: [],
+        calculationMode: 'both',
+        units: { primary: 'gallons' },
+        location: ''
+      });
+      loadKiosks();
+    } catch (error) {
+      console.error('Error saving kiosk:', error);
+      setMessage('Error saving kiosk');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditKiosk = (kiosk: any) => {
+    setEditingKiosk(kiosk);
+    setNewKiosk({
+      name: kiosk.name || '',
+      type: kiosk.type || 'specialty',
+      description: kiosk.description || '',
+      availableProducts: kiosk.availableProducts || [],
+      defaultTruckTypes: kiosk.defaultTruckTypes || [],
+      calculationMode: kiosk.calculationMode || 'both',
+      units: kiosk.units || { primary: 'gallons' },
+      location: kiosk.location || ''
+    });
+    setOpenKioskDialog(true);
+  };
+
+  const handleProductToggle = (productId: string, checked: boolean) => {
+    if (checked) {
+      setNewKiosk({
+        ...newKiosk,
+        availableProducts: [...newKiosk.availableProducts, productId]
+      });
+    } else {
+      setNewKiosk({
+        ...newKiosk,
+        availableProducts: newKiosk.availableProducts.filter(id => id !== productId)
+      });
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/login');
+    } catch (error) {
+      console.error('Error logging out:', error);
+      setMessage('Error logging out');
+    }
+  };
+
+  return (
+    <Container maxWidth="lg" sx={{ py: 4 }}>
+      <AppBar position="static" sx={{ bgcolor: 'primary.main', mb: 4 }}>
+        <Toolbar>
+          <AdminIcon sx={{ mr: 2 }} />
+          <Typography variant="h5" component="div" sx={{ flexGrow: 1, fontWeight: 'bold' }}>
+            TNT Admin Panel
+          </Typography>
+          <Button 
+            color="inherit" 
+            onClick={() => navigate('/dashboard')}
+            sx={{ mr: 2 }}
+          >
+            Back to Dashboard
+          </Button>
+          <Button color="inherit" onClick={handleLogout}>
+            Logout
+          </Button>
+        </Toolbar>
+      </AppBar>
+
+      {/* Navigation Cards */}
+      <Grid container spacing={4} justifyContent="center" sx={{ mb: 4 }}>
+        {navigationItems.map((item, index) => (
+          <Grid item xs={12} sm={6} md={4} key={index}>
+            <Card
+              sx={{
+                height: '200px',
+                display: 'flex',
+                flexDirection: 'column',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                '&:hover': {
+                  transform: 'translateY(-4px)',
+                  boxShadow: 4
+                }
+              }}
+              onClick={item.action}
+            >
+              <CardContent sx={{ flexGrow: 1, textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <Box sx={{ mb: 2 }}>
+                  {item.icon}
+                </Box>
+                <Typography variant="h6" component="h3" gutterBottom sx={{ fontWeight: 'bold' }}>
+                  {item.title}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {item.description}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        ))}
+      </Grid>
+
+      {/* Kiosk Management Dialog */}
+      <Dialog open={openKioskDialog} onClose={() => setOpenKioskDialog(false)} maxWidth="md" fullWidth>
+        <DialogTitle>
+          Kiosk Management
+          <IconButton
+            onClick={() => setOpenKioskDialog(false)}
+            sx={{ position: 'absolute', right: 8, top: 8 }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers>
+          {/* Existing Kiosks */}
+          <Typography variant="h6" gutterBottom>
+            Existing Kiosks
+          </Typography>
+          <Grid container spacing={2} sx={{ mb: 3 }}>
+            {kiosks.map((kiosk) => (
+              <Grid item xs={12} key={kiosk.id}>
+                <Card sx={{ mb: 2, border: currentKiosk?.id === kiosk.id ? '2px solid' : '1px solid', borderColor: currentKiosk?.id === kiosk.id ? 'primary.main' : 'grey.300' }}>
+                  <CardContent>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                      <Box sx={{ flexGrow: 1 }}>
+                        <Typography variant="h6">
+                          {kiosk.name}
+                          {currentKiosk?.id === kiosk.id && (
+                            <Chip label="Current" color="primary" size="small" sx={{ ml: 1 }} />
+                          )}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" gutterBottom>
+                          Type: {kiosk.type} • 
+                          Products: {kiosk.availableProducts?.length || 0} • 
+                          Location: {kiosk.location || 'Not specified'}
+                        </Typography>
+                        <Typography variant="body2">
+                          {kiosk.description}
+                        </Typography>
+                      </Box>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        startIcon={<EditIcon />}
+                        onClick={() => handleEditKiosk(kiosk)}
+                      >
+                        Edit
+                      </Button>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => {
+              setEditingKiosk(null);
+              setNewKiosk({
+                name: '',
+                type: 'specialty',
+                description: '',
+                availableProducts: [],
+                defaultTruckTypes: [],
+                calculationMode: 'both',
+                units: { primary: 'gallons' },
+                location: ''
+              });
+            }}
+            sx={{ mb: 3 }}
+          >
+            Add New Kiosk
+          </Button>
+
+          {/* Kiosk Form */}
+          {(editingKiosk || newKiosk.name) && (
+            <Box sx={{ border: '1px solid', borderColor: 'grey.300', borderRadius: 1, p: 2 }}>
+              <Typography variant="h6" gutterBottom>
+                {editingKiosk ? 'Edit Kiosk' : 'Add New Kiosk'}
+              </Typography>
+              
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="Kiosk Name"
+                    value={newKiosk.name}
+                    onChange={(e) => setNewKiosk({...newKiosk, name: e.target.value})}
+                    margin="dense"
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <FormControl fullWidth margin="dense">
+                    <InputLabel>Kiosk Type</InputLabel>
+                    <Select
+                      value={newKiosk.type}
+                      label="Kiosk Type"
+                      onChange={(e) => setNewKiosk({...newKiosk, type: e.target.value})}
+                    >
+                      <MenuItem value="specialty">Specialty (Main Terminal)</MenuItem>
+                      <MenuItem value="fertilizer">Fertilizer</MenuItem>
+                      <MenuItem value="mixed">Mixed</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Description"
+                    value={newKiosk.description}
+                    onChange={(e) => setNewKiosk({...newKiosk, description: e.target.value})}
+                    margin="dense"
+                    multiline
+                    rows={2}
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Location"
+                    value={newKiosk.location}
+                    onChange={(e) => setNewKiosk({...newKiosk, location: e.target.value})}
+                    margin="dense"
+                  />
+                </Grid>
+                
+                <Grid item xs={12}>
+                  <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
+                    Available Products
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                    Select which products should be available on this kiosk:
+                  </Typography>
+                  
+                  <Box sx={{ maxHeight: 200, overflow: 'auto', border: '1px solid', borderColor: 'grey.300', borderRadius: 1, p: 1 }}>
+                    {products.length === 0 ? (
+                      <Typography color="text.secondary">No products available. Please add products first.</Typography>
+                    ) : (
+                      <>
+                        <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+                          Found {products.length} product(s)
+                        </Typography>
+                        {products.map((product) => (
+                          <Box key={product.id} sx={{ display: 'flex', alignItems: 'center', py: 0.5 }}>
+                            <FormControlLabel
+                              control={
+                                <Checkbox
+                                  checked={newKiosk.availableProducts.includes(product.id)}
+                                  onChange={(e) => handleProductToggle(product.id, e.target.checked)}
+                                />
+                              }
+                              label={
+                                <Box>
+                                  <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                                    {product.name}
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary">
+                                    Type: {product.type} | ID: {product.id}
+                                  </Typography>
+                                </Box>
+                              }
+                            />
+                          </Box>
+                        ))}
+                      </>
+                    )}
+                  </Box>
+                </Grid>
+              </Grid>
+              
+              <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
+                <Button
+                  variant="contained"
+                  onClick={handleSaveKiosk}
+                  disabled={loading || !newKiosk.name}
+                >
+                  {loading ? 'Saving...' : editingKiosk ? 'Update Kiosk' : 'Create Kiosk'}
+                </Button>
+                <Button
+                  variant="outlined"
+                  onClick={() => {
+                    setEditingKiosk(null);
+                    setNewKiosk({
+                      name: '',
+                      type: 'specialty',
+                      description: '',
+                      availableProducts: [],
+                      defaultTruckTypes: [],
+                      calculationMode: 'both',
+                      units: { primary: 'gallons' },
+                      location: ''
+                    });
+                  }}
+                >
+                  Cancel
+                </Button>
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* User Management Dialog */}
+      <Dialog open={openUserDialog} onClose={() => setOpenUserDialog(false)} maxWidth="md" fullWidth>
+        <DialogTitle>
+          User Management
+          <IconButton
+            onClick={() => setOpenUserDialog(false)}
+            sx={{ position: 'absolute', right: 8, top: 8 }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="h6" gutterBottom>
+            System Users
+          </Typography>
+          <TableContainer component={Paper} sx={{ mb: 3 }}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Name</TableCell>
+                  <TableCell>User Code</TableCell>
+                  <TableCell>Role</TableCell>
+                  <TableCell>Status</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {users.map((user) => (
+                  <TableRow key={user.id}>
+                    <TableCell>{user.name}</TableCell>
+                    <TableCell>{user.userCode}</TableCell>
+                    <TableCell>
+                      <Chip 
+                        label={user.role} 
+                        color={user.role === 'admin' ? 'secondary' : 'primary'}
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Chip 
+                        label={user.isActive ? 'Active' : 'Inactive'} 
+                        color={user.isActive ? 'success' : 'default'}
+                        size="small"
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => {
+              setEditingUser(null);
+              setNewUser({ name: '', userCode: '', role: 'applicator', email: '', isActive: true });
+            }}
+          >
+            Add New User
+          </Button>
+
+          {/* User Form */}
+          <Box sx={{ mt: 3 }}>
+            <Typography variant="h6" gutterBottom>
+              {editingUser ? 'Edit User' : 'Add New User'}
+            </Typography>
+            
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Full Name"
+                  value={newUser.name}
+                  onChange={(e) => setNewUser({...newUser, name: e.target.value})}
+                  margin="dense"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="User Code"
+                  value={newUser.userCode}
+                  onChange={(e) => setNewUser({...newUser, userCode: e.target.value.toUpperCase()})}
+                  margin="dense"
+                  helperText="Unique identifier for the user"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <FormControl fullWidth margin="dense">
+                  <InputLabel>Role</InputLabel>
+                  <Select
+                    value={newUser.role}
+                    label="Role"
+                    onChange={(e) => setNewUser({...newUser, role: e.target.value})}
+                  >
+                    <MenuItem value="applicator">Applicator</MenuItem>
+                    <MenuItem value="admin">Administrator</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Email"
+                  type="email"
+                  value={newUser.email}
+                  onChange={(e) => setNewUser({...newUser, email: e.target.value})}
+                  margin="dense"
+                />
+              </Grid>
+            </Grid>
+            
+            <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
+              <Button
+                variant="contained"
+                onClick={handleSaveUser}
+                disabled={loading || !newUser.name || !newUser.userCode}
+              >
+                {loading ? 'Saving...' : editingUser ? 'Update User' : 'Create User'}
+              </Button>
+              <Button
+                variant="outlined"
+                onClick={() => {
+                  setEditingUser(null);
+                  setNewUser({ name: '', userCode: '', role: 'applicator', email: '', isActive: true });
+                }}
+              >
+                Cancel
+              </Button>
+            </Box>
+          </Box>
+        </DialogContent>
+      </Dialog>
+
+      {/* Success/Error Messages */}
+      <Snackbar
+        open={!!message}
+        autoHideDuration={6000}
+        onClose={() => setMessage('')}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setMessage('')} severity="info">
+          {message}
+        </Alert>
+      </Snackbar>
+    </Container>
+  );
+};
+
+export default AdminPanel;
