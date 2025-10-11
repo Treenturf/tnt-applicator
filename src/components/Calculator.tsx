@@ -68,7 +68,10 @@ const Calculator: React.FC = () => {
   const { currentKiosk } = useKiosk();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const preSelectedFertilizer = searchParams.get('fertilizer');
+  
+  // If we're on a fertilizer kiosk, ignore pre-selected fertilizer from URL
+  // (prevents cached URL params from interfering with the general calculator)
+  const preSelectedFertilizer = currentKiosk?.type === 'fertilizer' ? null : searchParams.get('fertilizer');
   const fertilizerName = searchParams.get('name');
   const truckType = searchParams.get('type'); // 'hose' or 'cart' for TNT Calculator
   
@@ -142,20 +145,32 @@ const Calculator: React.FC = () => {
   ];
 
   useEffect(() => {
+    console.log('🔧 Calculator useEffect - truckType:', truckType, 'preSelectedFertilizer:', preSelectedFertilizer);
+    
     if (preSelectedFertilizer) {
+      console.log('📌 Mode: Pre-selected fertilizer');
       setProducts(sampleProducts);
       setMode('fertilizer');
       setActiveInput('thousandSqFt'); // Auto-open keypad for fertilizer
     } else if (truckType === 'hose' || truckType === 'cart') {
+      console.log('📌 Mode: TNT Calculator - truck type:', truckType);
       setMode('tnt');
       loadDefaultApplication();
       // Auto-open keypad: front tank (driver tank for cart, front tank for hose)
       setActiveInput('frontTank');
     } else {
-      setProducts([]);
+      console.log('📌 Mode: Fertilizer Calculator - loading products from Firestore');
+      // Fertilizer mode - load products from Firestore
       setMode('fertilizer');
+      loadFertilizerProducts();
+      setActiveInput('thousandSqFt');
     }
   }, [preSelectedFertilizer, truckType]);
+
+  // Debug: Monitor calculations state changes
+  useEffect(() => {
+    console.log('📋 Calculations state updated:', calculations);
+  }, [calculations]);
 
   const loadDefaultApplication = async () => {
     try {
@@ -178,6 +193,29 @@ const Calculator: React.FC = () => {
     }
   };
 
+  const loadFertilizerProducts = async () => {
+    try {
+      console.log('🌾 Loading fertilizer products from Firestore...');
+      const productsSnapshot = await getDocs(collection(db, 'products'));
+      const allProducts = productsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as any[];
+      
+      // Filter for active fertilizer products
+      const fertilizerProducts = allProducts.filter(p => 
+        p.isActive && (p.type === 'fertilizer' || p.type === 'granular')
+      );
+      
+      console.log('📦 Loaded fertilizer products:', fertilizerProducts);
+      setProducts(fertilizerProducts);
+    } catch (error) {
+      console.error('❌ Error loading fertilizer products:', error);
+      // Fallback to sample products if Firestore fails
+      setProducts(sampleProducts);
+    }
+  };
+
   // Handle pre-selected fertilizer from URL
   useEffect(() => {
     if (preSelectedFertilizer && products.length > 0) {
@@ -196,12 +234,21 @@ const Calculator: React.FC = () => {
   }, [preSelectedFertilizer, fertilizerName, products]);
 
   const handleCalculate = () => {
+    console.log('🧮 Calculate button clicked');
+    console.log('Selected product:', selectedProduct);
+    console.log('ThousandSqFt:', thousandSqFt);
+    console.log('Products array:', products);
+    
     if (!selectedProduct || thousandSqFt <= 0) {
+      console.warn('❌ Missing data - selectedProduct:', selectedProduct, 'thousandSqFt:', thousandSqFt);
       return;
     }
 
     const product = products.find(p => p.id === selectedProduct);
+    console.log('Found product:', product);
+    
     if (!product || !product.poundsPer1000SqFt) {
+      console.warn('❌ Invalid product or missing poundsPer1000SqFt:', product);
       return;
     }
 
@@ -209,17 +256,24 @@ const Calculator: React.FC = () => {
     const totalPounds = thousandSqFt * product.poundsPer1000SqFt;
     const totalBags = product.poundsPerBag ? Math.ceil(totalPounds / product.poundsPerBag) : 0;
     const actualSquareFeet = thousandSqFt * 1000; // Convert for display/logging
+    const acres = actualSquareFeet / 43560; // Convert square feet to acres
+
+    console.log('📊 Calculation results:', { totalPounds, totalBags, actualSquareFeet, acres });
 
     const result: CalculationResult = {
       product,
       squareFeet: actualSquareFeet,
+      acres: acres,
       totalAmount: totalPounds,
       totalPounds,
       totalBags,
       tankSelection: 'granular'
     };
 
+    console.log('✅ Setting calculation result:', result);
+    console.log('📋 Current calculations state before setState:', calculations);
     setCalculations([result]);
+    console.log('📋 setCalculations called with:', [result]);
   };
 
   // TNT calculation logic for hose/cart trucks using default application
@@ -692,7 +746,7 @@ const Calculator: React.FC = () => {
                       {mode === 'fertilizer' ? (
                         <>
                           <Typography variant="body1">
-                            Area: {calc.acres} acres ({calc.squareFeet?.toLocaleString()} sq ft)
+                            Area: {calc.squareFeet?.toLocaleString()} sq ft
                           </Typography>
                           <Typography variant="h5" color="primary" sx={{ my: 1 }}>
                             {calc.totalBags} bags needed

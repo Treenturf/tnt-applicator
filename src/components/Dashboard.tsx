@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { 
   Container, 
   Typography, 
@@ -22,64 +22,12 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { useKiosk } from '../contexts/KioskContext';
 import { useNavigate } from 'react-router-dom';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '../firebase';
+
 
 const Dashboard: React.FC = () => {
   const { user, logout } = useAuth();
   const { currentKiosk, refreshKioskConfig } = useKiosk();
   const navigate = useNavigate();
-  const [fertilizerProducts, setFertilizerProducts] = useState<any[]>([]);
-
-  // Load fertilizer products for fertilizer kiosk
-  useEffect(() => {
-    if (currentKiosk?.type === 'fertilizer') {
-      loadFertilizerProducts();
-    }
-  }, [currentKiosk]);
-
-  const loadFertilizerProducts = async () => {
-    try {
-      // Load products from Firebase
-      const productsSnapshot = await getDocs(collection(db, 'products'));
-      const allProducts = productsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      
-      // Filter for active fertilizer products
-      const fertilizerProducts = allProducts.filter((product: any) => 
-        product.isActive && product.type === 'fertilizer'
-      );
-
-      // If kiosk has specific product assignments, filter by those
-      if (currentKiosk?.availableProducts && currentKiosk.availableProducts.length > 0) {
-        const assignedProducts = fertilizerProducts.filter((product: any) => 
-          currentKiosk.availableProducts.includes(product.id)
-        );
-        setFertilizerProducts(assignedProducts);
-      } else {
-        // Show all active fertilizer products if no specific assignment
-        setFertilizerProducts(fertilizerProducts);
-      }
-    } catch (error) {
-      console.error('Error loading fertilizer products:', error);
-      // Fallback to sample products on error
-      const sampleProducts = [
-        { id: '1', name: '10-10-10 Fertilizer', type: 'fertilizer', poundsPer1000SqFt: 2.5, isActive: true },
-        { id: '2', name: '16-4-8 Lawn Fertilizer', type: 'fertilizer', poundsPer1000SqFt: 3.0, isActive: true },
-        { id: '3', name: '0-0-60 Potash', type: 'fertilizer', poundsPer1000SqFt: 1.5, isActive: true },
-        { id: '4', name: '46-0-0 Urea', type: 'fertilizer', poundsPer1000SqFt: 2.0, isActive: true },
-        { id: '5', name: 'Lime', type: 'fertilizer', poundsPer1000SqFt: 10.0, isActive: true }
-      ];
-      setFertilizerProducts(sampleProducts);
-    }
-  };
-
-  const handleFertilizerSelect = (product: any) => {
-    // Navigate to calculator with pre-selected fertilizer
-    navigate(`/calculator?fertilizer=${product.id}&name=${encodeURIComponent(product.name)}`);
-  };
 
   const handleLogout = async () => {
     console.log('🚪 Logout button clicked');
@@ -179,6 +127,14 @@ const Dashboard: React.FC = () => {
       action: () => handleTruckSelection('cart'),
       color: 'success.main',
       available: currentKiosk?.type === 'specialty'
+    },
+    {
+      title: 'Dry Fertilizer Calculator',
+      description: 'Calculate fertilizer amounts for bagged products',
+      icon: <Typography sx={{ fontSize: 40 }}>🌾</Typography>,
+      action: () => navigate('/calculator'),
+      color: 'success.main',
+      available: currentKiosk?.type === 'fertilizer'
     },
     {
       title: 'View Reports',
@@ -295,78 +251,9 @@ const Dashboard: React.FC = () => {
           </Typography>
         </Box>
 
-        {/* Fertilizer Product Selection */}
-        {currentKiosk?.type === 'fertilizer' && (
-          <Box sx={{ mb: 4, maxWidth: 800, mx: 'auto' }}>
-            <Grid container spacing={3} justifyContent="center">
-              {fertilizerProducts.map((product) => (
-                <Grid item xs={12} sm={6} md={4} key={product.id}>
-                  <Card 
-                    sx={{ 
-                      height: '250px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      cursor: 'pointer',
-                      transition: 'all 0.3s ease',
-                      '&:hover': {
-                        transform: 'translateY(-4px)',
-                        boxShadow: 4,
-                        borderColor: 'primary.main'
-                      },
-                      border: 2,
-                      borderColor: 'transparent'
-                    }}
-                    onClick={() => handleFertilizerSelect(product)}
-                  >
-                    <CardContent sx={{ flexGrow: 1, textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                      <Box sx={{ mb: 2 }}>
-                        <Typography sx={{ fontSize: 40, mb: 1 }}>
-                          🌾
-                        </Typography>
-                      </Box>
-                      <Typography variant="h6" component="h3" gutterBottom sx={{ fontWeight: 'bold' }}>
-                        {product.name}
-                      </Typography>
-                      <Box sx={{ 
-                        backgroundColor: 'primary.light', 
-                        color: 'primary.contrastText', 
-                        borderRadius: 1, 
-                        py: 0.5, 
-                        px: 1, 
-                        display: 'inline-block',
-                        mt: 1
-                      }}>
-                        <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
-                          {product.poundsPer1000SqFt} lbs per 1000 sq ft
-                        </Typography>
-                      </Box>
-                      {product.description && (
-                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1, fontSize: '0.75rem' }}>
-                          {product.description}
-                        </Typography>
-                      )}
-                    </CardContent>
-                    <CardActions sx={{ justifyContent: 'center', pb: 2 }}>
-                      <Button 
-                        variant="contained" 
-                        color="primary"
-                        size="large"
-                        sx={{ minWidth: 120 }}
-                      >
-                        SELECT
-                      </Button>
-                    </CardActions>
-                  </Card>
-                </Grid>
-              ))}
-            </Grid>
-          </Box>
-        )}
-
-        {/* Action Cards - Show for specialty kiosk */}
-        {currentKiosk?.type === 'specialty' && (
-          <Grid container spacing={4} justifyContent="center">
-          {actionCards.filter(card => card.available).map((card, index) => (
+        {/* Action Cards - Show for all kiosks */}
+        <Grid container spacing={4} justifyContent="center">
+        {actionCards.filter(card => card.available).map((card, index) => (
             <Grid item xs={12} sm={8} md={6} lg={4} key={index}>
               <Card 
                 sx={{ 
@@ -414,7 +301,6 @@ const Dashboard: React.FC = () => {
             </Grid>
           ))}
           </Grid>
-        )}
 
       </Container>
     </>

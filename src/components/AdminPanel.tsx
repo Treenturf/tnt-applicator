@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Container,
   Typography,
@@ -40,7 +40,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { useKiosk } from '../contexts/KioskContext';
 import { useNavigate } from 'react-router-dom';
-import { collection, getDocs, addDoc, updateDoc, doc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, updateDoc, setDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 
 const AdminPanel: React.FC = () => {
@@ -172,13 +172,46 @@ const AdminPanel: React.FC = () => {
 
   const loadKiosks = async () => {
     try {
-      console.log('🖥️ AdminPanel: Loading default kiosks...');
-      // Import the default kiosks from types
-      const { DEFAULT_KIOSKS } = await import('../types/kiosk');
+      console.log('🖥️ AdminPanel: Loading kiosks...');
       
-      console.log('� AdminPanel: Loaded default kiosks:', DEFAULT_KIOSKS);
-      setKiosks(DEFAULT_KIOSKS);
-      console.log('💾 AdminPanel: Set kiosks state with', DEFAULT_KIOSKS.length, 'kiosks');
+      // Start with default kiosks
+      const { DEFAULT_KIOSKS } = await import('../types/kiosk');
+      console.log('📦 AdminPanel: Loaded', DEFAULT_KIOSKS.length, 'default kiosks');
+      
+      // Try to load saved configurations from Firestore
+      try {
+        const kiosksSnapshot = await getDocs(collection(db, 'kiosks'));
+        console.log('🔥 Firestore: Found', kiosksSnapshot.size, 'saved kiosk configurations');
+        
+        if (kiosksSnapshot.size > 0) {
+          // Map Firestore kiosks by ID
+          const firestoreKiosks = new Map();
+          kiosksSnapshot.docs.forEach(doc => {
+            firestoreKiosks.set(doc.id, { id: doc.id, ...doc.data() });
+          });
+          
+          // Merge: Use Firestore version if exists, otherwise use default
+          const mergedKiosks = DEFAULT_KIOSKS.map(defaultKiosk => {
+            const saved = firestoreKiosks.get(defaultKiosk.id);
+            if (saved) {
+              console.log('✅ Using saved config for:', defaultKiosk.id);
+              return saved;
+            }
+            console.log('📋 Using default config for:', defaultKiosk.id);
+            return defaultKiosk;
+          });
+          
+          setKiosks(mergedKiosks);
+          console.log('💾 AdminPanel: Loaded', mergedKiosks.length, 'kiosks (merged)');
+        } else {
+          // No Firestore kiosks, use defaults
+          setKiosks(DEFAULT_KIOSKS);
+          console.log('💾 AdminPanel: Using default kiosks only');
+        }
+      } catch (firestoreError) {
+        console.warn('⚠️ Could not load from Firestore, using defaults:', firestoreError);
+        setKiosks(DEFAULT_KIOSKS);
+      }
     } catch (error) {
       console.error('❌ AdminPanel: Error loading kiosks:', error);
       setMessage('Error loading kiosks');
@@ -220,17 +253,25 @@ const AdminPanel: React.FC = () => {
       setLoading(true);
       
       if (editingKiosk) {
+        // Update existing kiosk in Firestore
         const kioskToSave = {
           ...newKiosk,
-          updatedAt: new Date()
+          id: editingKiosk.id, // Keep the original ID
+          updatedAt: new Date().toISOString()
         };
-        await updateDoc(doc(db, 'kiosks', editingKiosk.id), kioskToSave);
+        
+        // Save to Firestore using the kiosk ID as document ID
+        await setDoc(doc(db, 'kiosks', editingKiosk.id), kioskToSave, { merge: true });
         setMessage(`Kiosk "${kioskToSave.name}" updated successfully! Products assigned: ${kioskToSave.availableProducts.length}`);
+        
+        console.log('✅ Updated kiosk in Firestore:', kioskToSave);
+        console.log('📦 Selected products:', kioskToSave.availableProducts);
       } else {
+        // Create new kiosk
         const kioskToSave = {
           ...newKiosk,
-          createdAt: new Date(),
-          updatedAt: new Date()
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
         };
         await addDoc(collection(db, 'kiosks'), kioskToSave);
         setMessage(`Kiosk "${kioskToSave.name}" created successfully! Products assigned: ${kioskToSave.availableProducts.length}`);
@@ -252,7 +293,7 @@ const AdminPanel: React.FC = () => {
       loadKiosks();
     } catch (error) {
       console.error('Error saving kiosk:', error);
-      setMessage('Error saving kiosk');
+      setMessage('Error saving kiosk. Check Firestore permissions.');
     } finally {
       setLoading(false);
     }
@@ -275,18 +316,41 @@ const AdminPanel: React.FC = () => {
   };
 
   const handleProductToggle = (productId: string, checked: boolean) => {
+    console.log('🔄 Toggle product:', productId, 'checked:', checked);
+    console.log('📦 Current availableProducts:', newKiosk.availableProducts);
+    
     if (checked) {
+      const updated = [...newKiosk.availableProducts, productId];
+      console.log('✅ Adding product. New list:', updated);
       setNewKiosk({
         ...newKiosk,
-        availableProducts: [...newKiosk.availableProducts, productId]
+        availableProducts: updated
       });
     } else {
+      const updated = newKiosk.availableProducts.filter(id => id !== productId);
+      console.log('❌ Removing product. New list:', updated);
       setNewKiosk({
         ...newKiosk,
-        availableProducts: newKiosk.availableProducts.filter(id => id !== productId)
+        availableProducts: updated
       });
     }
   };
+
+  // Memoize filtered products to prevent re-renders
+  const filteredProducts = useMemo(() => {
+    if (newKiosk.type === 'fertilizer') {
+      return products.filter(p => p.type === 'fertilizer' || p.type === 'granular');
+    } else if (newKiosk.type === 'specialty') {
+      return products.filter(p => 
+        p.type === 'herbicide' || 
+        p.type === 'insecticide' || 
+        p.type === 'spreader-sticker' ||
+        p.type === 'pre-emergent'
+      );
+    } else {
+      return products;
+    }
+  }, [products, newKiosk.type]);
 
   const handleLogout = async () => {
     try {
@@ -502,30 +566,40 @@ const AdminPanel: React.FC = () => {
                     ) : (
                       <>
                         <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
-                          Found {products.length} product(s)
+                          Found {filteredProducts.length} product(s) for this kiosk type
                         </Typography>
-                        {products.map((product) => (
-                          <Box key={product.id} sx={{ display: 'flex', alignItems: 'center', py: 0.5 }}>
-                            <FormControlLabel
-                              control={
-                                <Checkbox
-                                  checked={newKiosk.availableProducts.includes(product.id)}
-                                  onChange={(e) => handleProductToggle(product.id, e.target.checked)}
-                                />
-                              }
-                              label={
-                                <Box>
-                                  <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-                                    {product.name}
-                                  </Typography>
-                                  <Typography variant="caption" color="text.secondary">
-                                    Type: {product.type} | ID: {product.id}
-                                  </Typography>
-                                </Box>
-                              }
-                            />
-                          </Box>
-                        ))}
+                        {filteredProducts.length === 0 ? (
+                          <Typography color="text.secondary" sx={{ p: 2 }}>
+                            No products match this kiosk type. Add products first.
+                          </Typography>
+                        ) : (
+                          filteredProducts.map((product) => (
+                            <Box key={product.id} sx={{ display: 'flex', alignItems: 'center', py: 0.5 }}>
+                              <FormControlLabel
+                                key={`checkbox-${product.id}`}
+                                control={
+                                  <Checkbox
+                                    checked={newKiosk.availableProducts.includes(product.id)}
+                                    onChange={(e) => {
+                                      console.log('📌 Checkbox clicked!', product.id, e.target.checked);
+                                      handleProductToggle(product.id, e.target.checked);
+                                    }}
+                                  />
+                                }
+                                label={
+                                  <Box>
+                                    <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                                      {product.name}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                      Type: {product.type} | Category: {product.category}
+                                    </Typography>
+                                  </Box>
+                                }
+                              />
+                            </Box>
+                          ))
+                        )}
                       </>
                     )}
                   </Box>

@@ -55,8 +55,12 @@ interface Product {
   id: string;
   name: string;
   type: 'fertilizer' | 'herbicide' | 'insecticide' | 'pre-emergent' | 'spreader-sticker' | 'other';
+  // Liquid product properties
   hoseRatePerGallon: number; // Amount per gallon for hose truck
   cartRatePerGallon: number; // Amount per gallon for cart truck
+  // Granular/Fertilizer product properties
+  poundsPer1000SqFt?: number; // Application rate in pounds per 1000 square feet
+  poundsPerBag?: number; // Weight of each bag in pounds
   unit: string; // e.g., "lbs", "oz", "pints"
   description?: string;
   isActive: boolean;
@@ -77,6 +81,8 @@ const ProductManagement: React.FC = () => {
     type: 'fertilizer' as const,
     hoseRatePerGallon: 0,
     cartRatePerGallon: 0,
+    poundsPer1000SqFt: 0,
+    poundsPerBag: 50,
     unit: '',
     description: '',
     isActive: true
@@ -146,6 +152,8 @@ const ProductManagement: React.FC = () => {
         type: 'fertilizer', 
         hoseRatePerGallon: 0, 
         cartRatePerGallon: 0,
+        poundsPer1000SqFt: 0,
+        poundsPerBag: 50,
         unit: '', 
         description: '', 
         isActive: true 
@@ -185,6 +193,8 @@ const ProductManagement: React.FC = () => {
         type: editingProduct.type,
         hoseRatePerGallon: editingProduct.hoseRatePerGallon || 0,
         cartRatePerGallon: editingProduct.cartRatePerGallon || 0,
+        poundsPer1000SqFt: editingProduct.poundsPer1000SqFt || 0,
+        poundsPerBag: editingProduct.poundsPerBag || 50,
         unit: editingProduct.unit,
         description: editingProduct.description || '',
         isActive: editingProduct.isActive
@@ -568,6 +578,46 @@ const ProductManagement: React.FC = () => {
               sx={{ mb: 2 }}
               inputProps={{ min: 0, step: 0.1 }}
               helperText="Amount of product needed per gallon for cart truck (0 = not applicable)"
+            />
+
+            <TextField
+              margin="dense"
+              label="Pounds per 1000 Sq Ft (Fertilizer)"
+              type="number"
+              fullWidth
+              variant="outlined"
+              value={editingProduct ? (editingProduct.poundsPer1000SqFt || 0) : (newProduct.poundsPer1000SqFt || 0)}
+              onChange={(e) => {
+                const value = parseFloat(e.target.value) || 0;
+                if (editingProduct) {
+                  setEditingProduct({ ...editingProduct, poundsPer1000SqFt: value });
+                } else {
+                  setNewProduct({ ...newProduct, poundsPer1000SqFt: value });
+                }
+              }}
+              sx={{ mb: 2 }}
+              inputProps={{ min: 0, step: 0.1 }}
+              helperText="Application rate for granular/fertilizer products (0 = not applicable)"
+            />
+
+            <TextField
+              margin="dense"
+              label="Pounds per Bag (Fertilizer)"
+              type="number"
+              fullWidth
+              variant="outlined"
+              value={editingProduct ? (editingProduct.poundsPerBag || 50) : (newProduct.poundsPerBag || 50)}
+              onChange={(e) => {
+                const value = parseFloat(e.target.value) || 0;
+                if (editingProduct) {
+                  setEditingProduct({ ...editingProduct, poundsPerBag: value });
+                } else {
+                  setNewProduct({ ...newProduct, poundsPerBag: value });
+                }
+              }}
+              sx={{ mb: 2 }}
+              inputProps={{ min: 0, step: 1 }}
+              helperText="Weight of each bag in pounds (typically 50)"
             />
 
             <TextField

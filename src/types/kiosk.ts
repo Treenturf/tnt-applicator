@@ -30,7 +30,7 @@ export interface KioskProduct {
 
 export const KIOSK_TYPES = {
   specialty: {
-    name: 'Specialty Applications',
+    name: 'Standard Applications',
     description: 'Liquid chemicals, herbicides, insecticides',
     icon: '🧪',
     color: '#e91e63',
@@ -38,7 +38,7 @@ export const KIOSK_TYPES = {
     truckTypes: ['hose', 'cart']
   },
   fertilizer: {
-    name: 'Bagged Fertilizer',
+    name: 'Dry Fertilizer',
     description: 'Granular products, measured in bags/pounds', 
     icon: '🌾',
     color: '#4caf50',
@@ -58,7 +58,7 @@ export const KIOSK_TYPES = {
 export const DEFAULT_KIOSKS: KioskConfig[] = [
   {
     id: 'main-terminal',
-    name: 'Main Terminal',
+    name: 'Specialty Applications',
     type: 'mixed',
     description: 'Primary loading station with all products',
     availableProducts: [], // Will be populated with all products
@@ -68,7 +68,7 @@ export const DEFAULT_KIOSKS: KioskConfig[] = [
   },
   {
     id: 'specialty-kiosk',
-    name: 'Specialty Applications Kiosk',
+    name: 'Standard Applications',
     type: 'specialty',
     description: 'Liquid chemicals and herbicides only',
     availableProducts: [], // Will be filtered to specialty products
@@ -78,7 +78,7 @@ export const DEFAULT_KIOSKS: KioskConfig[] = [
   },
   {
     id: 'fertilizer-kiosk',
-    name: 'Bagged Fertilizer Kiosk',
+    name: 'Dry Fertilizer',
     type: 'fertilizer',
     description: 'Granular fertilizer products only',
     availableProducts: [], // Will be filtered to fertilizer products
