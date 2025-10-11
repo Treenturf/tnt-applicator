@@ -358,11 +358,73 @@ const Calculator: React.FC = () => {
     try {
       if (calculations.length > 0) {
         // Save application to database
+        if (mode === 'fertilizer') {
+          // Save fertilizer application
+          await addDoc(collection(db, 'applications'), {
+            userCode: user?.userCode,
+            userName: user?.name,
+            kioskId: currentKiosk?.id || 'fertilizer-kiosk',
+            kioskName: currentKiosk?.name || 'Dry Fertilizer',
+            calculations: calculations.map(calc => ({
+              productId: calc.product.id,
+              productName: calc.product.name,
+              productType: calc.product.type,
+              squareFeet: calc.squareFeet,
+              totalPounds: calc.totalPounds,
+              totalBags: calc.totalBags,
+              unit: calc.product.unit
+            })),
+            totalSquareFeet: calculations.reduce((sum, calc) => sum + (calc.squareFeet || 0), 0),
+            timestamp: serverTimestamp(),
+            sessionType: 'fertilizer'
+          });
+          console.log('✅ Fertilizer application saved to database');
+        } else {
+          // Save TNT application (liquid products)
+          await addDoc(collection(db, 'applications'), {
+            userCode: user?.userCode,
+            userName: user?.name,
+            kioskId: currentKiosk?.id || 'specialty-kiosk',
+            kioskName: currentKiosk?.name || 'Specialty Applications',
+            applicationName: defaultApplication?.name || 'TNT Mix',
+            truckType: truckType,
+            calculations: calculations.map(calc => ({
+              productId: calc.product.id,
+              productName: calc.product.name,
+              productType: calc.product.type,
+              frontTankGallons: calc.frontTankGallons,
+              backTankGallons: calc.backTankGallons,
+              frontTankOunces: calc.frontTankOunces,
+              backTankOunces: calc.backTankOunces,
+              totalOunces: calc.ouncesNeeded,
+              unit: calc.product.unit
+            })),
+            totalGallons: frontTank + backTank,
+            frontTankGallons: frontTank,
+            backTankGallons: backTank,
+            timestamp: serverTimestamp(),
+            sessionType: 'tnt'
+          });
+          console.log('✅ TNT application saved to database');
+        }
+      }
+      
+      await logout();
+      navigate('/');
+    } catch (error) {
+      console.error('Error during logout:', error);
+    }
+  };
+
+  const handleSaveAndReset = async () => {
+    try {
+      if (calculations.length > 0) {
+        // Save fertilizer application
         await addDoc(collection(db, 'applications'), {
           userCode: user?.userCode,
           userName: user?.name,
-          kioskId: currentKiosk?.id || 'fertilizer',
-          kioskName: currentKiosk?.name || 'Fertilizer Kiosk',
+          kioskId: currentKiosk?.id || 'fertilizer-kiosk',
+          kioskName: currentKiosk?.name || 'Dry Fertilizer',
           calculations: calculations.map(calc => ({
             productId: calc.product.id,
             productName: calc.product.name,
@@ -376,13 +438,16 @@ const Calculator: React.FC = () => {
           timestamp: serverTimestamp(),
           sessionType: 'fertilizer'
         });
-        console.log('✅ Fertilizer application saved to database');
+        console.log('✅ Fertilizer application saved, resetting calculator');
       }
       
-      await logout();
-      navigate('/');
+      // Reset the calculator
+      setSelectedProduct('');
+      setThousandSqFt(0);
+      setCalculations([]);
+      setActiveInput('thousandSqFt');
     } catch (error) {
-      console.error('Error during logout:', error);
+      console.error('Error saving application:', error);
     }
   };
 
@@ -515,14 +580,25 @@ const Calculator: React.FC = () => {
     <>
       <AppBar position="static">
         <Toolbar>
-          <Button 
-            color="inherit" 
-            startIcon={<BackIcon />}
-            onClick={() => navigate('/dashboard')}
-            sx={{ mr: 2 }}
-          >
-            Back to Dashboard
-          </Button>
+          {mode === 'fertilizer' ? (
+            <Button 
+              color="inherit" 
+              startIcon={<LogoutIcon />}
+              onClick={handleLogOut}
+              sx={{ mr: 2 }}
+            >
+              Logout
+            </Button>
+          ) : (
+            <Button 
+              color="inherit" 
+              startIcon={<BackIcon />}
+              onClick={() => navigate('/dashboard')}
+              sx={{ mr: 2 }}
+            >
+              Back to Dashboard
+            </Button>
+          )}
           <TruckIcon sx={{ mr: 2 }} />
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
             {mode === 'tnt' ? 'TNT Calculator' : 'Fertilizer Calculator'}
@@ -796,6 +872,20 @@ const Calculator: React.FC = () => {
                     </Box>
                   ))}
 
+                  {mode === 'fertilizer' && (
+                    <Button 
+                      fullWidth 
+                      variant="outlined" 
+                      color="success"
+                      size="large"
+                      onClick={handleSaveAndReset}
+                      startIcon={<CalculateIcon />}
+                      sx={{ mt: 3, mb: 2 }}
+                    >
+                      Do Another Calculation
+                    </Button>
+                  )}
+
                   <Button 
                     fullWidth 
                     variant="contained" 
@@ -803,7 +893,7 @@ const Calculator: React.FC = () => {
                     size="large"
                     onClick={handleLogOut}
                     startIcon={<LogoutIcon />}
-                    sx={{ mt: 3 }}
+                    sx={{ mt: mode === 'fertilizer' ? 0 : 3 }}
                   >
                     Complete & Log Out
                   </Button>

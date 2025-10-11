@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { 
   Container, 
   Typography, 
@@ -28,6 +28,14 @@ const Dashboard: React.FC = () => {
   const { user, logout } = useAuth();
   const { currentKiosk, refreshKioskConfig } = useKiosk();
   const navigate = useNavigate();
+
+  // Auto-redirect to calculator for fertilizer kiosk (all users including admin)
+  useEffect(() => {
+    if (currentKiosk?.type === 'fertilizer') {
+      console.log('🌾 Fertilizer kiosk detected - redirecting to calculator');
+      navigate('/calculator', { replace: true });
+    }
+  }, [currentKiosk, navigate]);
 
   const handleLogout = async () => {
     console.log('🚪 Logout button clicked');
@@ -70,14 +78,12 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  const handleChangeKiosk = () => {
+  const handleChangeKiosk = async () => {
     // Clear kiosk configuration to show selector again
     localStorage.removeItem('tnt-current-kiosk-id');
     localStorage.removeItem('tnt-kiosk-last-set');
-    // Force the context to refresh
-    refreshKioskConfig().then(() => {
-      window.location.reload();
-    });
+    // Refresh the context - this will show the KioskSelector since isKioskConfigured will be false
+    await refreshKioskConfig();
   };
 
   const handleTruckSelection = (truckType: 'hose' | 'cart') => {
