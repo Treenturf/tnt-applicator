@@ -116,21 +116,11 @@ const AdminPanel: React.FC = () => {
     },
     {
       title: 'Kiosk Management', 
-      description: 'Configure kiosk settings and product assignments',
+      description: 'Configure kiosk terminals and their settings',
       icon: <Typography sx={{ fontSize: 40 }}>🖥️</Typography>,
       action: () => {
-        setEditingKiosk(null);
-        setIsAddingKiosk(false);
-        setNewKiosk({
-          name: '',
-          type: 'specialty',
-          description: '',
-          availableProducts: [],
-          defaultTruckTypes: [],
-          calculationMode: 'both',
-          units: { primary: 'gallons' },
-          location: ''
-        });
+        // Load kiosks and open dialog
+        loadKiosks();
         setOpenKioskDialog(true);
       },
       color: 'secondary.main'
@@ -182,18 +172,13 @@ const AdminPanel: React.FC = () => {
 
   const loadKiosks = async () => {
     try {
-      console.log('🖥️ AdminPanel: Loading kiosks...');
-      const kiosksSnapshot = await getDocs(collection(db, 'kiosks'));
-      console.log('📦 AdminPanel: Kiosks snapshot size:', kiosksSnapshot.size);
+      console.log('🖥️ AdminPanel: Loading default kiosks...');
+      // Import the default kiosks from types
+      const { DEFAULT_KIOSKS } = await import('../types/kiosk');
       
-      const kiosksData = kiosksSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      console.log('🖥️ AdminPanel: Mapped kiosks:', kiosksData);
-      
-      setKiosks(kiosksData);
-      console.log('💾 AdminPanel: Set kiosks state with', kiosksData.length, 'kiosks');
+      console.log('� AdminPanel: Loaded default kiosks:', DEFAULT_KIOSKS);
+      setKiosks(DEFAULT_KIOSKS);
+      console.log('💾 AdminPanel: Set kiosks state with', DEFAULT_KIOSKS.length, 'kiosks');
     } catch (error) {
       console.error('❌ AdminPanel: Error loading kiosks:', error);
       setMessage('Error loading kiosks');
