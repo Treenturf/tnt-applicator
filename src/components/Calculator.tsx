@@ -17,7 +17,8 @@ import {
   ArrowBack as BackIcon,
   Calculate as CalculateIcon,
   LocalShipping as TruckIcon,
-  Logout as LogoutIcon
+  Logout as LogoutIcon,
+  Computer as KioskIcon
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useKiosk } from '../contexts/KioskContext';
@@ -65,7 +66,7 @@ interface CalculationResult {
 
 const Calculator: React.FC = () => {
   const { user, logout } = useAuth();
-  const { currentKiosk } = useKiosk();
+  const { currentKiosk, refreshKioskConfig } = useKiosk();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   
@@ -202,9 +203,12 @@ const Calculator: React.FC = () => {
         ...doc.data()
       })) as any[];
       
-      // Filter for active fertilizer products
+      // Filter for active fertilizer products that have the required poundsPer1000SqFt field
       const fertilizerProducts = allProducts.filter(p => 
-        p.isActive && (p.type === 'fertilizer' || p.type === 'granular')
+        p.isActive && 
+        (p.type === 'fertilizer' || p.type === 'granular') &&
+        p.poundsPer1000SqFt !== undefined && 
+        p.poundsPer1000SqFt > 0
       );
       
       console.log('📦 Loaded fertilizer products:', fertilizerProducts);
@@ -451,6 +455,16 @@ const Calculator: React.FC = () => {
     }
   };
 
+  const handleChangeKiosk = async () => {
+    // Clear kiosk configuration to show selector again
+    localStorage.removeItem('tnt-current-kiosk-id');
+    localStorage.removeItem('tnt-kiosk-last-set');
+    // Refresh the context and navigate to dashboard
+    await refreshKioskConfig();
+    // Navigate to dashboard which will show KioskSelector via KioskConfigWrapper
+    navigate('/dashboard', { replace: true });
+  };
+
   // Keypad functions
   const handleKeypadInput = (value: string) => {
     if (!activeInput) return;
@@ -608,9 +622,25 @@ const Calculator: React.FC = () => {
               </Typography>
             )}
           </Typography>
-          <Typography variant="subtitle1">
+          <Typography variant="subtitle1" sx={{ mr: 2 }}>
             {user?.name} ({user?.userCode})
           </Typography>
+          {mode === 'fertilizer' && user?.role?.toLowerCase() === 'admin' && (
+            <Button
+              size="small"
+              color="inherit"
+              onClick={handleChangeKiosk}
+              startIcon={<KioskIcon />}
+              sx={{ 
+                color: 'rgba(255,255,255,0.9)',
+                fontSize: '0.75rem',
+                bgcolor: 'rgba(255,255,255,0.1)',
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' }
+              }}
+            >
+              Change Kiosk
+            </Button>
+          )}
         </Toolbar>
       </AppBar>
 
