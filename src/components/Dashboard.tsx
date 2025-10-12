@@ -319,8 +319,8 @@ const Dashboard: React.FC = () => {
                   }
                 }}
                 onClick={() => {
-                  // Navigate to calculator with this application recipe
-                  navigate(`/calculator?application=${app.id}&name=${encodeURIComponent(app.name)}`);
+                  // Navigate to equipment selector for this application recipe
+                  navigate(`/equipment-selector?application=${app.id}&name=${encodeURIComponent(app.name)}`);
                 }}
               >
                 <CardContent sx={{ flexGrow: 1, textAlign: 'center', pt: 3, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
@@ -348,7 +348,7 @@ const Dashboard: React.FC = () => {
                   <Button 
                     variant="contained" 
                     onClick={() => {
-                      navigate(`/calculator?application=${app.id}&name=${encodeURIComponent(app.name)}`);
+                      navigate(`/equipment-selector?application=${app.id}&name=${encodeURIComponent(app.name)}`);
                     }}
                     sx={{ 
                       minWidth: '160px',

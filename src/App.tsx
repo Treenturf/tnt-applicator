@@ -14,6 +14,7 @@ import AdminPanel from './components/AdminPanel.tsx';
 import ProductManagement from './components/ProductManagement.tsx';
 import ApplicationManagement from './components/ApplicationManagement.tsx';
 import Calculator from './components/Calculator.tsx';
+import EquipmentSelector from './components/EquipmentSelector.tsx';
 import Reports from './components/Reports.tsx';
 import Analytics from './components/Analytics.tsx';
 import TodaysLoadingTotals from './components/TodaysLoadingTotals.tsx';
@@ -75,6 +76,13 @@ const AppContent: React.FC = () => {
             <ErrorBoundary>
               <Calculator />
             </ErrorBoundary>
+          </ProtectedRoute>
+        } />
+        <Route path="/equipment-selector" element={
+          <ProtectedRoute>
+            <KioskConfigWrapper>
+              <EquipmentSelector />
+            </KioskConfigWrapper>
           </ProtectedRoute>
         } />
         <Route path="/reports" element={

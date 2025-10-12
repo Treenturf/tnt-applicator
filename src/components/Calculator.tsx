@@ -75,16 +75,19 @@ const Calculator: React.FC = () => {
   const preSelectedFertilizer = currentKiosk?.type === 'fertilizer' ? null : searchParams.get('fertilizer');
   const fertilizerName = searchParams.get('name');
   const truckType = searchParams.get('type'); // 'hose' or 'cart' for TNT Calculator
+  const applicationId = searchParams.get('application'); // Application recipe ID from equipment selector
+  const equipmentType = searchParams.get('equipment'); // 'trailer' or 'backpack' from equipment selector
   
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<string>('');
   const [defaultApplication, setDefaultApplication] = useState<any>(null);
+  const [selectedApplication, setSelectedApplication] = useState<any>(null); // Specific application from equipment selector
   const [thousandSqFt, setThousandSqFt] = useState<number>(0);
   const [frontTank, setFrontTank] = useState<number>(0);
   const [backTank, setBackTank] = useState<number>(0);
   const [calculations, setCalculations] = useState<CalculationResult[]>([]);
   const [activeInput, setActiveInput] = useState<'thousandSqFt' | 'frontTank' | 'backTank' | null>(null);
-  const [mode, setMode] = useState<'fertilizer' | 'tnt'>('fertilizer');
+  const [mode, setMode] = useState<'fertilizer' | 'tnt' | 'application'>('fertilizer');
 
   // Sample fertilizer products for testing
   const sampleProducts: Product[] = [
@@ -146,9 +149,15 @@ const Calculator: React.FC = () => {
   ];
 
   useEffect(() => {
-    console.log('🔧 Calculator useEffect - truckType:', truckType, 'preSelectedFertilizer:', preSelectedFertilizer);
+    console.log('🔧 Calculator useEffect - truckType:', truckType, 'preSelectedFertilizer:', preSelectedFertilizer, 'applicationId:', applicationId, 'equipment:', equipmentType);
     
-    if (preSelectedFertilizer) {
+    if (applicationId && equipmentType) {
+      console.log('📌 Mode: Application Recipe with Equipment');
+      setMode('application');
+      loadSelectedApplication(applicationId);
+      // Auto-open keypad for gallons input
+      setActiveInput('frontTank');
+    } else if (preSelectedFertilizer) {
       console.log('📌 Mode: Pre-selected fertilizer');
       setProducts(sampleProducts);
       setMode('fertilizer');
@@ -166,7 +175,7 @@ const Calculator: React.FC = () => {
       loadFertilizerProducts();
       setActiveInput('thousandSqFt');
     }
-  }, [preSelectedFertilizer, truckType]);
+  }, [preSelectedFertilizer, truckType, applicationId, equipmentType]);
 
   // Debug: Monitor calculations state changes
   useEffect(() => {
@@ -191,6 +200,29 @@ const Calculator: React.FC = () => {
       }
     } catch (error) {
       console.error('Error loading default application:', error);
+    }
+  };
+
+  const loadSelectedApplication = async (appId: string) => {
+    try {
+      console.log('🎯 Loading selected application:', appId);
+      const applicationsSnapshot = await getDocs(collection(db, 'applications'));
+      const applicationsData = applicationsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as any[];
+      
+      // Find the specific application by ID
+      const app = applicationsData.find(a => a.id === appId && a.isActive);
+      
+      if (app) {
+        setSelectedApplication(app);
+        console.log('✅ Loaded application recipe:', app.name, 'with', app.products?.length || 0, 'products');
+      } else {
+        console.error('❌ Application not found or inactive:', appId);
+      }
+    } catch (error) {
+      console.error('❌ Error loading selected application:', error);
     }
   };
 
@@ -290,21 +322,56 @@ const Calculator: React.FC = () => {
     console.log('📋 setCalculations called with:', [result]);
   };
 
-  // TNT calculation logic for hose/cart trucks using default application
+  // TNT calculation logic for hose/cart trucks using default application or selected application
   const handleTntCalculate = () => {
-    if (!defaultApplication || !defaultApplication.products || defaultApplication.products.length === 0) {
-      console.warn('No default application or products found');
+    // Use selectedApplication if in application mode, otherwise use defaultApplication
+    const applicationToUse = mode === 'application' ? selectedApplication : defaultApplication;
+    
+    if (!applicationToUse || !applicationToUse.products || applicationToUse.products.length === 0) {
+      console.warn('No application or products found');
       return;
     }
 
     const results: CalculationResult[] = [];
 
-    if (truckType === 'hose') {
+    // For application mode, both trailer and backpack use single tank
+    if (mode === 'application') {
+      // Application mode: Single tank for both trailer and backpack
+      if (frontTank <= 0) return;
+      
+      // Calculate for each product in the application recipe
+      applicationToUse.products.forEach((appProduct: any) => {
+        const rate = appProduct.hoseRate || 0; // Use hoseRate for application mode
+        const tankOunces = frontTank * rate;
+        
+        const result: CalculationResult = {
+          product: {
+            id: appProduct.productId,
+            name: appProduct.productName,
+            type: appProduct.productType || 'herbicide',
+            hoseRatePerGallon: rate,
+            cartRatePerGallon: appProduct.cartRate || 0,
+            poundsPer1000SqFt: 0,
+            poundsPerBag: 0,
+            unit: appProduct.unit || 'ounces',
+            isActive: true
+          },
+          gallons: frontTank,
+          frontTankGallons: frontTank,
+          backTankGallons: 0,
+          frontTankOunces: tankOunces,
+          backTankOunces: 0,
+          ouncesNeeded: tankOunces,
+          tankSelection: equipmentType || 'application'
+        };
+        results.push(result);
+      });
+    } else if (truckType === 'hose') {
       // Hose truck: calculate for both tanks separately for each product
       if (frontTank <= 0 && backTank <= 0) return;
       
       // Calculate for each product in the application recipe
-      defaultApplication.products.forEach((appProduct: any) => {
+      applicationToUse.products.forEach((appProduct: any) => {
         const rate = appProduct.hoseRate || 0;
         const frontTankOunces = frontTank * rate;
         const backTankOunces = backTank * rate;
@@ -332,11 +399,11 @@ const Calculator: React.FC = () => {
         results.push(result);
       });
     } else {
-      // Cart truck: dual tank calculation for each product (driver and passenger tanks)
+      // Cart truck: Dual tank calculation (driver and passenger tanks)
       if (frontTank <= 0 && backTank <= 0) return;
       
       // Calculate for each product in the application recipe
-      defaultApplication.products.forEach((appProduct: any) => {
+      applicationToUse.products.forEach((appProduct: any) => {
         const rate = appProduct.cartRate || 0;
         const driverTankOunces = frontTank * rate;
         const passengerTankOunces = backTank * rate;
@@ -543,18 +610,22 @@ const Calculator: React.FC = () => {
 
     let label = 'Enter 1000 Square Feet';
     if (activeInput === 'frontTank') {
-      if (truckType === 'cart') {
+      if (mode === 'application') {
+        label = 'Enter Tank Gallons';
+      } else if (truckType === 'cart') {
         label = 'Enter Driver Tank Gallons';
       } else {
         label = 'Enter Front Tank Gallons';
       }
     } else if (activeInput === 'backTank') {
-      if (truckType === 'cart') {
+      if (mode === 'application') {
+        label = 'Enter Tank Gallons';
+      } else if (truckType === 'cart') {
         label = 'Enter Passenger Tank Gallons';
       } else {
         label = 'Enter Back Tank Gallons';
       }
-    } else if (mode === 'tnt') {
+    } else if (mode === 'tnt' || mode === 'application') {
       label = 'Enter Gallons';
     }
 
@@ -625,7 +696,7 @@ const Calculator: React.FC = () => {
           )}
           <TruckIcon sx={{ mr: 2 }} />
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            {mode === 'tnt' ? 'TNT Calculator' : 'Fertilizer Calculator'}
+            {mode === 'application' ? 'Application Calculator' : mode === 'tnt' ? 'TNT Calculator' : 'Fertilizer Calculator'}
             {currentKiosk && (
               <Typography variant="subtitle2" component="div" sx={{ color: 'rgba(255,255,255,0.7)' }}>
                 🏭 {currentKiosk.name}
@@ -661,7 +732,7 @@ const Calculator: React.FC = () => {
               <CardContent>
                 <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
                   <CalculateIcon sx={{ mr: 1 }} />
-                  {mode === 'tnt' ? 'TNT Calculator' : 'Fertilizer Calculator'}
+                  {mode === 'application' ? 'Application Calculator' : mode === 'tnt' ? 'TNT Calculator' : 'Fertilizer Calculator'}
                 </Typography>
 
                 {/* Product Selection */}
@@ -696,6 +767,23 @@ const Calculator: React.FC = () => {
                   </Box>
                 )}
 
+                {/* Display selected application for application mode */}
+                {mode === 'application' && selectedApplication && (
+                  <Box sx={{ mb: 3, p: 2, bgcolor: 'success.light', borderRadius: 1, color: 'success.contrastText' }}>
+                    <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 1 }}>
+                      {selectedApplication.name}
+                    </Typography>
+                    <Typography variant="body1" sx={{ mb: 1 }}>
+                      Equipment: {equipmentType === 'trailer' ? '🚜 Trailer' : '🎒 Backpack'}
+                    </Typography>
+                    {selectedApplication.description && (
+                      <Typography variant="body2">
+                        {selectedApplication.description}
+                      </Typography>
+                    )}
+                  </Box>
+                )}
+
                 {/* 1000 Square Feet Input (fertilizer) or Gallons Input (TNT) */}
                 {mode === 'fertilizer' && (
                   <TextField
@@ -717,7 +805,7 @@ const Calculator: React.FC = () => {
                     }}
                   />
                 )}
-                {/* Tank Inputs - Different for hose vs cart */}
+                {/* Tank Inputs - Different for hose vs cart vs application mode */}
                 {mode === 'tnt' && truckType === 'hose' && (
                   <>
                     <Grid container spacing={2} sx={{ mb: 3 }}>
@@ -761,6 +849,27 @@ const Calculator: React.FC = () => {
                       </Grid>
                     </Grid>
                   </>
+                )}
+                {/* Application Mode - Single tank for both trailer and backpack */}
+                {mode === 'application' && (
+                  <TextField
+                    fullWidth
+                    label="Tank (Gallons)"
+                    value={frontTank || ''}
+                    onClick={() => setActiveInput('frontTank')}
+                    InputProps={{
+                      readOnly: true,
+                      style: { cursor: 'pointer', fontSize: '1.2rem', textAlign: 'center' }
+                    }}
+                    sx={{
+                      mb: 3,
+                      '& .MuiOutlinedInput-root': {
+                        '&:hover': {
+                          backgroundColor: 'action.hover'
+                        }
+                      }
+                    }}
+                  />
                 )}
                 {mode === 'tnt' && truckType === 'cart' && (
                   <>
@@ -825,15 +934,16 @@ const Calculator: React.FC = () => {
                     Calculate Fertilizer
                   </Button>
                 )}
-                {mode === 'tnt' && (
+                {(mode === 'tnt' || mode === 'application') && (
                   <Button 
                     fullWidth 
                     variant="contained" 
                     size="large"
                     onClick={handleTntCalculate}
                     disabled={
-                      !defaultApplication || 
-                      (frontTank <= 0 && backTank <= 0)
+                      (mode === 'tnt' && !defaultApplication) ||
+                      (mode === 'application' && !selectedApplication) ||
+                      (mode === 'application' ? frontTank <= 0 : (frontTank <= 0 && backTank <= 0))
                     }
                     startIcon={<CalculateIcon />}
                     sx={{ mt: 2 }}
@@ -851,7 +961,7 @@ const Calculator: React.FC = () => {
               <Card>
                 <CardContent>
                   <Typography variant="h5" gutterBottom>
-                    {mode === 'tnt' ? 'TNT Mix Requirements' : 'Fertilizer Requirements'}
+                    {mode === 'application' ? 'Application Mix Requirements' : mode === 'tnt' ? 'TNT Mix Requirements' : 'Fertilizer Requirements'}
                   </Typography>
 
                   {calculations.map((calc, index) => (
@@ -873,7 +983,21 @@ const Calculator: React.FC = () => {
                         </>
                       ) : (
                         <>
-                          {calc.frontTankGallons !== undefined && calc.backTankGallons !== undefined ? (
+                          {mode === 'application' ? (
+                            // Application mode: Single tank display
+                            <>
+                              <Typography variant="body1" sx={{ fontWeight: 'bold', mb: 1 }}>
+                                Tank: {calc.frontTankGallons} gallons
+                              </Typography>
+                              <Typography variant="h5" color="primary" sx={{ textAlign: 'center', my: 2 }}>
+                                {calc.ouncesNeeded?.toFixed(2)} oz needed
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                Rate: {calc.product.hoseRatePerGallon} oz/gal
+                              </Typography>
+                            </>
+                          ) : calc.frontTankGallons !== undefined && calc.backTankGallons !== undefined && calc.backTankGallons > 0 ? (
+                            // TNT mode: Two tanks display
                             <>
                               <Typography variant="body1" sx={{ fontWeight: 'bold', mb: 1 }}>
                                 {truckType === 'cart' ? 'Driver Tank' : 'Front Tank'}: {calc.frontTankGallons} gallons
@@ -895,6 +1019,7 @@ const Calculator: React.FC = () => {
                               </Typography>
                             </>
                           ) : (
+                            // Fallback: Single tank display
                             <>
                               <Typography variant="body1">
                                 Gallons: {calc.gallons}

@@ -52,6 +52,7 @@ const AdminPanel: React.FC = () => {
   const [users, setUsers] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [kiosks, setKiosks] = useState<any[]>([]);
+  const [applications, setApplications] = useState<any[]>([]);
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   
@@ -76,6 +77,7 @@ const AdminPanel: React.FC = () => {
     type: string;
     description: string;
     availableProducts: string[];
+    availableApplications?: string[];
     defaultTruckTypes: string[];
     calculationMode: string;
     units: { primary: string };
@@ -85,6 +87,7 @@ const AdminPanel: React.FC = () => {
     type: 'specialty',
     description: '',
     availableProducts: [],
+    availableApplications: [],
     defaultTruckTypes: [],
     calculationMode: 'both',
     units: { primary: 'gallons' },
@@ -133,6 +136,7 @@ const AdminPanel: React.FC = () => {
     loadUsers();
     loadProducts();
     loadKiosks();
+    loadApplications();
   }, []);
 
   const loadUsers = async () => {
@@ -169,6 +173,24 @@ const AdminPanel: React.FC = () => {
     } catch (error) {
       console.error('❌ AdminPanel: Error loading products:', error);
       setMessage('Error loading products');
+    }
+  };
+
+  const loadApplications = async () => {
+    try {
+      console.log('🔍 AdminPanel: Loading applications from Firebase...');
+      const applicationsSnapshot = await getDocs(collection(db, 'applications'));
+      const applicationsData = applicationsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      const activeApplications = applicationsData.filter((a: any) => a.isActive);
+      setApplications(activeApplications);
+      console.log('💾 AdminPanel: Loaded', activeApplications.length, 'active applications');
+    } catch (error) {
+      console.error('❌ AdminPanel: Error loading applications:', error);
+      setMessage('Error loading applications');
     }
   };
 
@@ -297,6 +319,7 @@ const AdminPanel: React.FC = () => {
         type: 'specialty',
         description: '',
         availableProducts: [],
+        availableApplications: [],
         defaultTruckTypes: [],
         calculationMode: 'both',
         units: { primary: 'gallons' },
@@ -319,6 +342,7 @@ const AdminPanel: React.FC = () => {
       type: kiosk.type || 'specialty',
       description: kiosk.description || '',
       availableProducts: kiosk.availableProducts || [],
+      availableApplications: kiosk.availableApplications || [],
       defaultTruckTypes: kiosk.defaultTruckTypes || [],
       calculationMode: kiosk.calculationMode || 'both',
       units: kiosk.units || { primary: 'gallons' },
@@ -355,6 +379,34 @@ const AdminPanel: React.FC = () => {
     console.log('💾 State updated with', updated.length, 'products');
   };
 
+  const handleApplicationToggle = (applicationId: string, checked: boolean) => {
+    console.log('🔄 Toggle application:', applicationId, 'checked:', checked);
+    console.log('📋 Current availableApplications:', newKiosk.availableApplications);
+    
+    const currentApplications = newKiosk.availableApplications || [];
+    let updated: string[];
+    
+    if (checked) {
+      // Add application if not already in list
+      updated = currentApplications.includes(applicationId) 
+        ? currentApplications 
+        : [...currentApplications, applicationId];
+      console.log('✅ Adding application. New list:', updated);
+    } else {
+      // Remove application
+      updated = currentApplications.filter(id => id !== applicationId);
+      console.log('❌ Removing application. New list:', updated);
+    }
+    
+    // Update the state with a completely new object
+    setNewKiosk(prev => ({
+      ...prev,
+      availableApplications: updated
+    }));
+    
+    console.log('💾 State updated with', updated.length, 'applications');
+  };
+
   // Memoize filtered products to prevent re-renders
   const filteredProducts = useMemo(() => {
     if (newKiosk.type === 'fertilizer') {
@@ -370,6 +422,13 @@ const AdminPanel: React.FC = () => {
       return products;
     }
   }, [products, newKiosk.type]);
+
+  // Memoize filtered applications to prevent re-renders
+  const filteredApplications = useMemo(() => {
+    return applications.filter(app => 
+      app.availableKiosks?.includes(newKiosk.type) || false
+    );
+  }, [applications, newKiosk.type]);
 
   // Log when availableProducts changes
   useEffect(() => {
@@ -517,6 +576,7 @@ const AdminPanel: React.FC = () => {
                 type: 'specialty',
                 description: '',
                 availableProducts: [],
+                availableApplications: [],
                 defaultTruckTypes: [],
                 calculationMode: 'both',
                 units: { primary: 'gallons' },
@@ -583,10 +643,12 @@ const AdminPanel: React.FC = () => {
                 
                 <Grid item xs={12}>
                   <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
-                    Available Products
+                    {newKiosk.type === 'mixed' ? 'Available Recipes' : 'Available Products'}
                   </Typography>
                   <Typography variant="body2" color="text.secondary" gutterBottom>
-                    Select which products should be available on this kiosk:
+                    {newKiosk.type === 'mixed' 
+                      ? 'Select which application recipes should be available on this kiosk:' 
+                      : 'Select which products should be available on this kiosk:'}
                   </Typography>
                   
                   <Box 
@@ -599,7 +661,53 @@ const AdminPanel: React.FC = () => {
                       p: 1
                     }}
                   >
-                    {products.length === 0 ? (
+                    {newKiosk.type === 'mixed' ? (
+                      // Show applications for mixed/specialty kiosk
+                      filteredApplications.length === 0 ? (
+                        <Typography color="text.secondary">No applications available for this kiosk type.</Typography>
+                      ) : (
+                        filteredApplications.map((application) => (
+                          <Box 
+                            key={application.id} 
+                            sx={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              py: 0.5,
+                              px: 1,
+                              cursor: 'pointer',
+                              '&:hover': { bgcolor: 'action.hover' },
+                              borderRadius: 1
+                            }}
+                          >
+                            <Checkbox
+                              checked={newKiosk.availableApplications?.includes(application.id) || false}
+                              onChange={(e) => {
+                                console.log('📌 Application checkbox changed!', application.name, application.id, 'New state:', e.target.checked);
+                                handleApplicationToggle(application.id, e.target.checked);
+                              }}
+                            />
+                            <Box 
+                              sx={{ ml: 1, flexGrow: 1, cursor: 'pointer' }}
+                              onClick={() => {
+                                const isCurrentlyChecked = newKiosk.availableApplications?.includes(application.id) || false;
+                                const newCheckedState = !isCurrentlyChecked;
+                                console.log('📌 Application label clicked!', application.name, 'Toggle to:', newCheckedState);
+                                handleApplicationToggle(application.id, newCheckedState);
+                              }}
+                            >
+                              <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                                {application.name}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {application.description || 'No description'}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        ))
+                      )
+                    ) : (
+                      // Show products for other kiosk types
+                    products.length === 0 ? (
                       <Typography color="text.secondary">No products available. Please add products first.</Typography>
                     ) : (
                       <>
@@ -651,6 +759,7 @@ const AdminPanel: React.FC = () => {
                           ))
                         )}
                       </>
+                    )
                     )}
                   </Box>
                 </Grid>
@@ -673,6 +782,7 @@ const AdminPanel: React.FC = () => {
                       type: 'specialty',
                       description: '',
                       availableProducts: [],
+                      availableApplications: [],
                       defaultTruckTypes: [],
                       calculationMode: 'both',
                       units: { primary: 'gallons' },
