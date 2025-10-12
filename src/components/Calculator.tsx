@@ -10,7 +10,6 @@ import {
   Toolbar,
   TextField,
   Grid,
-  MenuItem,
   Divider
 } from '@mui/material';
 import { 
@@ -659,14 +658,6 @@ const Calculator: React.FC = () => {
             ))}
           </Grid>
         ))}
-        <Button
-          variant="outlined"
-          fullWidth
-          sx={{ mt: 2 }}
-          onClick={() => setActiveInput(null)}
-        >
-          Close Keypad
-        </Button>
       </Box>
     );
   };
@@ -675,16 +666,7 @@ const Calculator: React.FC = () => {
     <>
       <AppBar position="static">
         <Toolbar>
-          {mode === 'fertilizer' ? (
-            <Button 
-              color="inherit" 
-              startIcon={<LogoutIcon />}
-              onClick={handleLogOut}
-              sx={{ mr: 2 }}
-            >
-              Logout
-            </Button>
-          ) : (
+          {mode !== 'fertilizer' && (
             <Button 
               color="inherit" 
               startIcon={<BackIcon />}
@@ -694,63 +676,170 @@ const Calculator: React.FC = () => {
               Back to Dashboard
             </Button>
           )}
-          <TruckIcon sx={{ mr: 2 }} />
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            {mode === 'application' ? 'Application Calculator' : mode === 'tnt' ? 'TNT Calculator' : 'Fertilizer Calculator'}
-            {currentKiosk && (
-              <Typography variant="subtitle2" component="div" sx={{ color: 'rgba(255,255,255,0.7)' }}>
-                🏭 {currentKiosk.name}
-              </Typography>
+          <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: mode === 'fertilizer' ? 'center' : 'flex-start' }}>
+            {mode === 'fertilizer' && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <TruckIcon sx={{ fontSize: 40 }} />
+                <Typography variant="h6" component="div">
+                  Fertilizer Calculator
+                  {currentKiosk && (
+                    <Typography variant="subtitle2" component="div" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+                      🏭 {currentKiosk.name}
+                    </Typography>
+                  )}
+                </Typography>
+                {user?.role?.toLowerCase() === 'admin' && (
+                  <Button
+                    size="small"
+                    color="inherit"
+                    onClick={handleChangeKiosk}
+                    startIcon={<KioskIcon />}
+                    sx={{ 
+                      color: 'rgba(255,255,255,0.9)',
+                      minWidth: 'auto',
+                      fontSize: '0.75rem',
+                      bgcolor: 'rgba(255,255,255,0.1)',
+                      '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' }
+                    }}
+                  >
+                    Change Kiosk
+                  </Button>
+                )}
+              </Box>
             )}
-          </Typography>
-          <Typography variant="subtitle1" sx={{ mr: 2 }}>
-            {user?.name} ({user?.userCode})
-          </Typography>
-          {mode === 'fertilizer' && user?.role?.toLowerCase() === 'admin' && (
-            <Button
-              size="small"
-              color="inherit"
-              onClick={handleChangeKiosk}
-              startIcon={<KioskIcon />}
+            {mode !== 'fertilizer' && (
+              <>
+                <TruckIcon sx={{ mr: 2 }} />
+                <Typography variant="h6" component="div">
+                  {mode === 'application' ? 'Application Calculator' : 'TNT Calculator'}
+                  {currentKiosk && (
+                    <Typography variant="subtitle2" component="div" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+                      🏭 {currentKiosk.name}
+                    </Typography>
+                  )}
+                </Typography>
+              </>
+            )}
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box sx={{ textAlign: 'right' }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                {user?.name}
+              </Typography>
+              <Typography variant="caption">
+                {user?.role?.toLowerCase() === 'admin' ? 'Administrator' : ''} Applicator Code: {user?.userCode}
+              </Typography>
+            </Box>
+            <Button 
+              color="inherit" 
+              onClick={handleLogOut}
+              startIcon={<LogoutIcon />}
               sx={{ 
-                color: 'rgba(255,255,255,0.9)',
-                fontSize: '0.75rem',
-                bgcolor: 'rgba(255,255,255,0.1)',
-                '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' }
+                bgcolor: 'rgba(255,255,255,0.1)', 
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } 
               }}
             >
-              Change Kiosk
+              Logout
             </Button>
-          )}
+          </Box>
         </Toolbar>
       </AppBar>
 
       <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-        <Grid container spacing={3}>
-          <Grid item xs={12} md={6}>
-            <Card>
-              <CardContent>
-                <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-                  <CalculateIcon sx={{ mr: 1 }} />
-                  {mode === 'application' ? 'Application Calculator' : mode === 'tnt' ? 'TNT Calculator' : 'Fertilizer Calculator'}
-                </Typography>
-
-                {/* Product Selection */}
-                {mode === 'fertilizer' && !preSelectedFertilizer && (
-                  <TextField
-                    select
-                    fullWidth
-                    label="Select Fertilizer"
-                    value={selectedProduct}
-                    onChange={(e) => setSelectedProduct(e.target.value)}
-                    sx={{ mb: 3 }}
+        {/* Product Selection Cards - Only show in fertilizer mode without pre-selected product */}
+        {mode === 'fertilizer' && !preSelectedFertilizer && !selectedProduct && (
+          <Box sx={{ mb: 4 }}>
+            <Typography variant="h4" gutterBottom sx={{ textAlign: 'center', fontWeight: 'bold', color: 'primary.main', mb: 3 }}>
+              Select Your Fertilizer Product
+            </Typography>
+            <Grid container spacing={3} justifyContent="center">
+              {products.map((product) => (
+                <Grid item xs={12} sm={6} md={4} key={product.id}>
+                  <Card 
+                    sx={{ 
+                      height: '220px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s ease',
+                      border: selectedProduct === product.id ? '3px solid' : '1px solid',
+                      borderColor: selectedProduct === product.id ? 'primary.main' : 'grey.300',
+                      '&:hover': {
+                        transform: 'translateY(-4px)',
+                        boxShadow: 6,
+                        borderColor: 'primary.main'
+                      }
+                    }}
+                    onClick={() => {
+                      setSelectedProduct(product.id);
+                      setActiveInput('thousandSqFt');
+                    }}
                   >
-                    {products.map((product) => (
-                      <MenuItem key={product.id} value={product.id}>
-                        {product.name} - {product.poundsPer1000SqFt} lbs/1000 sq ft
-                      </MenuItem>
-                    ))}
-                  </TextField>
+                    <CardContent sx={{ flexGrow: 1, textAlign: 'center', pt: 3, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                      <Typography variant="h5" component="h2" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                        {product.name}
+                      </Typography>
+                      <Typography variant="h6" color="text.secondary" sx={{ mt: 2 }}>
+                        {product.poundsPer1000SqFt} lbs/1000 sq ft
+                      </Typography>
+                      {product.description && (
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                          {product.description}
+                        </Typography>
+                      )}
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          </Box>
+        )}
+
+        <Grid container spacing={3}>
+          {/* Only show calculator card in fertilizer mode if a product is selected */}
+          {(mode !== 'fertilizer' || selectedProduct) && (
+            <Grid item xs={12} md={6}>
+              <Card>
+                <CardContent>
+                  <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                    <CalculateIcon sx={{ mr: 1 }} />
+                    {mode === 'application' ? 'Application Calculator' : mode === 'tnt' ? 'TNT Calculator' : 'Fertilizer Calculator'}
+                  </Typography>
+
+                  {/* Display selected product name in fertilizer mode */}
+                  {mode === 'fertilizer' && selectedProduct && (
+                  <Box sx={{ mb: 3, p: 2, bgcolor: 'success.light', borderRadius: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Box>
+                      <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'success.contrastText' }}>
+                        {products.find(p => p.id === selectedProduct)?.name}
+                      </Typography>
+                      <Typography variant="body2" sx={{ color: 'success.contrastText' }}>
+                        {products.find(p => p.id === selectedProduct)?.poundsPer1000SqFt} lbs/1000 sq ft
+                      </Typography>
+                    </Box>
+                    {!preSelectedFertilizer && (
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={() => {
+                          setSelectedProduct('');
+                          setThousandSqFt(0);
+                          setCalculations([]);
+                          setActiveInput(null);
+                        }}
+                        sx={{ 
+                          color: 'success.contrastText',
+                          borderColor: 'success.contrastText',
+                          '&:hover': {
+                            bgcolor: 'rgba(255,255,255,0.1)',
+                            borderColor: 'success.contrastText'
+                          }
+                        }}
+                      >
+                        Change
+                      </Button>
+                    )}
+                  </Box>
                 )}
 
                 {/* Display default application name for TNT mode */}
@@ -954,6 +1043,7 @@ const Calculator: React.FC = () => {
               </CardContent>
             </Card>
           </Grid>
+          )}
 
           {/* Results */}
           {calculations.length > 0 && (

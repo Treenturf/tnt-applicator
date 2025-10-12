@@ -48,7 +48,9 @@ import {
   Star as DefaultIcon,
   CheckCircle as CheckIcon,
   LocalShipping as HoseTruckIcon,
-  ShoppingCart as CartTruckIcon
+  ShoppingCart as CartTruckIcon,
+  Upgrade as TrailerIcon,
+  Backpack as BackpackIcon
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -71,7 +73,8 @@ interface ApplicationProduct {
   hoseRate: number;
   cartRate: number;
   unit: string;
-  truckTypes: ('hose' | 'cart')[]; // Array to support multiple truck types
+  equipmentTypes: ('hose-truck' | 'trailer' | 'cart-truck' | 'backpack')[]; // Array to support individual equipment types
+  truckTypes?: ('hose' | 'cart')[]; // Legacy field for backward compatibility
 }
 
 interface Application {
@@ -93,6 +96,8 @@ interface Product {
   type: 'fertilizer' | 'herbicide' | 'insecticide' | 'pre-emergent' | 'spreader-sticker' | 'other';
   hoseRatePerGallon: number;
   cartRatePerGallon: number;
+  backpackRatePerGallon?: number;
+  trailerRatePerGallon?: number;
   unit: string;
   description?: string;
   isActive: boolean;
@@ -102,24 +107,33 @@ const ApplicationManagement: React.FC = () => {
   const {} = useAuth(); // Using auth context for consistency
   const navigate = useNavigate();
 
-  // Helper function to determine truck compatibility for an application
-  const getTruckCompatibility = (application: Application) => {
-    const hasHoseRates = application.products.some(p => p.hoseRate > 0);
-    const hasCartRates = application.products.some(p => p.cartRate > 0);
-    return { hasHoseRates, hasCartRates };
-  };
-
-  // Helper function to migrate legacy product data (add truckTypes if missing)
+  // Helper function to migrate legacy product data (add equipmentTypes if missing)
   const migrateLegacyProduct = (product: any): ApplicationProduct => {
-    if (!product.truckTypes) {
-      // For legacy products, add truck types based on rates
-      const truckTypes: ('hose' | 'cart')[] = [];
-      if (product.hoseRate > 0) truckTypes.push('hose');
-      if (product.cartRate > 0) truckTypes.push('cart');
+    if (!product.equipmentTypes) {
+      // For legacy products, convert old truckTypes to new equipmentTypes
+      const equipmentTypes: ('hose-truck' | 'trailer' | 'cart-truck' | 'backpack')[] = [];
+      
+      if (product.truckTypes) {
+        // Migrate from old truckTypes format
+        if (product.truckTypes.includes('hose')) {
+          equipmentTypes.push('hose-truck', 'trailer');
+        }
+        if (product.truckTypes.includes('cart')) {
+          equipmentTypes.push('cart-truck', 'backpack');
+        }
+      } else {
+        // Very old products without truckTypes - use rates
+        if (product.hoseRate > 0) {
+          equipmentTypes.push('hose-truck', 'trailer');
+        }
+        if (product.cartRate > 0) {
+          equipmentTypes.push('cart-truck', 'backpack');
+        }
+      }
       
       return {
         ...product,
-        truckTypes: truckTypes.length > 0 ? truckTypes : ['cart'] // Default to cart if no rates
+        equipmentTypes: equipmentTypes.length > 0 ? equipmentTypes : ['cart-truck', 'backpack']
       };
     }
     return product;
@@ -143,7 +157,7 @@ const ApplicationManagement: React.FC = () => {
   // Product selection state
   const [openProductDialog, setOpenProductDialog] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [selectedTruckTypes, setSelectedTruckTypes] = useState<('hose' | 'cart')[]>([]);
+  const [selectedEquipmentTypes, setSelectedEquipmentTypes] = useState<('hose-truck' | 'trailer' | 'cart-truck' | 'backpack')[]>([]);
 
   useEffect(() => {
     // Clear any previous error messages and force fresh state
@@ -386,8 +400,8 @@ const ApplicationManagement: React.FC = () => {
   };
 
   const addProductToApplication = () => {
-    if (!selectedProduct || selectedTruckTypes.length === 0) {
-      setMessage('Please select a product and at least one truck type');
+    if (!selectedProduct || selectedEquipmentTypes.length === 0) {
+      setMessage('Please select a product and at least one equipment type');
       return;
     }
 
@@ -398,7 +412,7 @@ const ApplicationManagement: React.FC = () => {
       hoseRate: selectedProduct.hoseRatePerGallon || 0,
       cartRate: selectedProduct.cartRatePerGallon || 0,
       unit: selectedProduct.unit,
-      truckTypes: [...selectedTruckTypes]
+      equipmentTypes: [...selectedEquipmentTypes]
     };
 
     if (editingApplication) {
@@ -428,7 +442,7 @@ const ApplicationManagement: React.FC = () => {
     }
 
     setSelectedProduct(null);
-    setSelectedTruckTypes([]);
+    setSelectedEquipmentTypes([]);
     setOpenProductDialog(false);
     setMessage(`Added ${selectedProduct.name} to application`);
   };
@@ -567,7 +581,7 @@ const ApplicationManagement: React.FC = () => {
                     <TableCell>Application Name</TableCell>
                     <TableCell>Category</TableCell>
                     <TableCell>Products</TableCell>
-                    <TableCell>Truck Compatibility</TableCell>
+                    <TableCell>Equipment Compatibility</TableCell>
                     <TableCell>Available Kiosks</TableCell>
                     <TableCell>Status</TableCell>
                     <TableCell>Actions</TableCell>
@@ -610,30 +624,55 @@ const ApplicationManagement: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         {(() => {
-                          const compatibility = getTruckCompatibility(application);
+                          // Collect all unique equipment types from all products
+                          const allEquipmentTypes = new Set<string>();
+                          application.products.forEach(product => {
+                            const migratedProduct = migrateLegacyProduct(product);
+                            migratedProduct.equipmentTypes.forEach(type => allEquipmentTypes.add(type));
+                          });
+                          
                           return (
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                              {compatibility.hasHoseRates && (
+                              {allEquipmentTypes.size > 0 ? (
+                                Array.from(allEquipmentTypes).sort().map(equipType => {
+                                  const getEquipmentIcon = (type: string) => {
+                                    switch(type) {
+                                      case 'hose-truck': return <HoseTruckIcon />;
+                                      case 'trailer': return <TrailerIcon />;
+                                      case 'cart-truck': return <CartTruckIcon />;
+                                      case 'backpack': return <BackpackIcon />;
+                                      default: return <CheckIcon />;
+                                    }
+                                  };
+                                  
+                                  const getEquipmentLabel = (type: string) => {
+                                    switch(type) {
+                                      case 'hose-truck': return 'Hose Truck';
+                                      case 'trailer': return 'Trailer';
+                                      case 'cart-truck': return 'Cart Truck';
+                                      case 'backpack': return 'Backpack';
+                                      default: return type;
+                                    }
+                                  };
+                                  
+                                  const getEquipmentColor = (type: string) => {
+                                    return (type === 'hose-truck' || type === 'trailer') ? 'primary' : 'secondary';
+                                  };
+                                  
+                                  return (
+                                    <Chip
+                                      key={equipType}
+                                      icon={getEquipmentIcon(equipType)}
+                                      label={getEquipmentLabel(equipType)}
+                                      size="small"
+                                      color={getEquipmentColor(equipType)}
+                                      variant="outlined"
+                                    />
+                                  );
+                                })
+                              ) : (
                                 <Chip
-                                  icon={<CheckIcon />}
-                                  label="Hose Truck"
-                                  size="small"
-                                  color="primary"
-                                  variant="outlined"
-                                />
-                              )}
-                              {compatibility.hasCartRates && (
-                                <Chip
-                                  icon={<CheckIcon />}
-                                  label="Cart Truck"
-                                  size="small"
-                                  color="secondary"
-                                  variant="outlined"
-                                />
-                              )}
-                              {!compatibility.hasHoseRates && !compatibility.hasCartRates && (
-                                <Chip
-                                  label="No rates set"
+                                  label="No equipment set"
                                   size="small"
                                   color="error"
                                   variant="outlined"
@@ -1011,7 +1050,7 @@ const ApplicationManagement: React.FC = () => {
                     startIcon={<AddProductIcon />}
                     onClick={() => {
                       setSelectedProduct(null);
-                      setSelectedTruckTypes([]);
+                      setSelectedEquipmentTypes([]);
                       setOpenProductDialog(true);
                     }}
                   >
@@ -1021,7 +1060,11 @@ const ApplicationManagement: React.FC = () => {
                 
                 {currentProducts.length > 0 ? (
                   <List>
-                    {currentProducts.map((product) => (
+                    {currentProducts.map((product) => {
+                      // Migrate legacy products
+                      const migratedProduct = migrateLegacyProduct(product);
+                      
+                      return (
                       <ListItem key={product.productId} divider>
                         <ListItemText
                           primary={
@@ -1029,50 +1072,44 @@ const ApplicationManagement: React.FC = () => {
                               <Typography variant="body1" component="span">
                                 {product.productName}
                               </Typography>
-                              {/* Selected truck types for this product */}
-                              <Box sx={{ display: 'flex', gap: 0.5, ml: 1 }}>
-                                {product.truckTypes ? (
-                                  product.truckTypes.map((truckType) => (
+                              {/* Selected equipment types for this product */}
+                              <Box sx={{ display: 'flex', gap: 0.5, ml: 1, flexWrap: 'wrap' }}>
+                                {migratedProduct.equipmentTypes.map((equipType) => {
+                                  const getEquipmentIcon = (type: string) => {
+                                    switch(type) {
+                                      case 'hose-truck': return <HoseTruckIcon />;
+                                      case 'trailer': return <TrailerIcon />;
+                                      case 'cart-truck': return <CartTruckIcon />;
+                                      case 'backpack': return <BackpackIcon />;
+                                      default: return <CheckIcon />;
+                                    }
+                                  };
+                                  
+                                  const getEquipmentLabel = (type: string) => {
+                                    switch(type) {
+                                      case 'hose-truck': return 'Hose Truck';
+                                      case 'trailer': return 'Trailer';
+                                      case 'cart-truck': return 'Cart Truck';
+                                      case 'backpack': return 'Backpack';
+                                      default: return type;
+                                    }
+                                  };
+                                  
+                                  const getEquipmentColor = (type: string) => {
+                                    return (type === 'hose-truck' || type === 'trailer') ? 'primary' : 'secondary';
+                                  };
+                                  
+                                  return (
                                     <Chip
-                                      key={truckType}
-                                      icon={truckType === 'hose' ? <HoseTruckIcon /> : <CartTruckIcon />}
-                                      label={`${truckType === 'hose' ? 'Hose' : 'Cart'} Truck`}
+                                      key={equipType}
+                                      icon={getEquipmentIcon(equipType)}
+                                      label={getEquipmentLabel(equipType)}
                                       size="small"
-                                      color={truckType === 'hose' ? 'primary' : 'secondary'}
+                                      color={getEquipmentColor(equipType)}
                                       variant="filled"
                                     />
-                                  ))
-                                ) : (
-                                  // Fallback for legacy products without truckTypes
-                                  <>
-                                    {product.hoseRate > 0 && (
-                                      <Chip
-                                        icon={<CheckIcon />}
-                                        label="Hose Truck"
-                                        size="small"
-                                        color="primary"
-                                        variant="outlined"
-                                      />
-                                    )}
-                                    {product.cartRate > 0 && (
-                                      <Chip
-                                        icon={<CheckIcon />}
-                                        label="Cart Truck"
-                                        size="small"
-                                        color="secondary"
-                                        variant="outlined"
-                                      />
-                                    )}
-                                    {product.hoseRate === 0 && product.cartRate === 0 && (
-                                      <Chip
-                                        label="No rates set"
-                                        size="small"
-                                        color="error"
-                                        variant="outlined"
-                                      />
-                                    )}
-                                  </>
-                                )}
+                                  );
+                                })}
                               </Box>
                             </Box>
                           }
@@ -1088,7 +1125,8 @@ const ApplicationManagement: React.FC = () => {
                           </IconButton>
                         </ListItemSecondaryAction>
                       </ListItem>
-                    ))}
+                      );
+                    })}
                   </List>
                 ) : (
                   <Alert severity="info">
@@ -1142,47 +1180,84 @@ const ApplicationManagement: React.FC = () => {
             {selectedProduct && (
               <Box sx={{ mt: 2 }}>
                 <Typography variant="subtitle2" gutterBottom>
-                  Select Truck Types for this Product:
+                  Select Equipment Types for this Product:
+                </Typography>
+                <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+                  Hose: {selectedProduct.hoseRatePerGallon || 0} | Trailer: {selectedProduct.trailerRatePerGallon || 0} | Cart: {selectedProduct.cartRatePerGallon || 0} | Backpack: {selectedProduct.backpackRatePerGallon || 0} {selectedProduct.unit}/gal
                 </Typography>
                 <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                   <Chip
                     icon={<HoseTruckIcon />}
                     label={`Hose Truck (${selectedProduct.hoseRatePerGallon || 0} ${selectedProduct.unit}/gal)`}
                     clickable
-                    color={selectedTruckTypes.includes('hose') ? 'primary' : 'default'}
-                    variant={selectedTruckTypes.includes('hose') ? 'filled' : 'outlined'}
+                    color={selectedEquipmentTypes.includes('hose-truck') ? 'primary' : 'default'}
+                    variant={selectedEquipmentTypes.includes('hose-truck') ? 'filled' : 'outlined'}
                     onClick={() => {
-                      if (selectedProduct.hoseRatePerGallon > 0) {
-                        setSelectedTruckTypes(prev => 
-                          prev.includes('hose') 
-                            ? prev.filter(t => t !== 'hose')
-                            : [...prev, 'hose']
+                      if (selectedProduct.hoseRatePerGallon && selectedProduct.hoseRatePerGallon > 0) {
+                        setSelectedEquipmentTypes(prev => 
+                          prev.includes('hose-truck') 
+                            ? prev.filter(t => t !== 'hose-truck')
+                            : [...prev, 'hose-truck']
                         );
                       }
                     }}
-                    disabled={selectedProduct.hoseRatePerGallon <= 0}
+                    disabled={!selectedProduct.hoseRatePerGallon || selectedProduct.hoseRatePerGallon <= 0}
+                  />
+                  <Chip
+                    icon={<TrailerIcon />}
+                    label={`Trailer (${selectedProduct.trailerRatePerGallon || 0} ${selectedProduct.unit}/gal)`}
+                    clickable
+                    color={selectedEquipmentTypes.includes('trailer') ? 'primary' : 'default'}
+                    variant={selectedEquipmentTypes.includes('trailer') ? 'filled' : 'outlined'}
+                    onClick={() => {
+                      if (selectedProduct.trailerRatePerGallon && selectedProduct.trailerRatePerGallon > 0) {
+                        setSelectedEquipmentTypes(prev => 
+                          prev.includes('trailer') 
+                            ? prev.filter(t => t !== 'trailer')
+                            : [...prev, 'trailer']
+                        );
+                      }
+                    }}
+                    disabled={!selectedProduct.trailerRatePerGallon || selectedProduct.trailerRatePerGallon <= 0}
                   />
                   <Chip
                     icon={<CartTruckIcon />}
                     label={`Cart Truck (${selectedProduct.cartRatePerGallon || 0} ${selectedProduct.unit}/gal)`}
                     clickable
-                    color={selectedTruckTypes.includes('cart') ? 'primary' : 'default'}
-                    variant={selectedTruckTypes.includes('cart') ? 'filled' : 'outlined'}
+                    color={selectedEquipmentTypes.includes('cart-truck') ? 'secondary' : 'default'}
+                    variant={selectedEquipmentTypes.includes('cart-truck') ? 'filled' : 'outlined'}
                     onClick={() => {
-                      if (selectedProduct.cartRatePerGallon > 0) {
-                        setSelectedTruckTypes(prev => 
-                          prev.includes('cart') 
-                            ? prev.filter(t => t !== 'cart')
-                            : [...prev, 'cart']
+                      if (selectedProduct.cartRatePerGallon && selectedProduct.cartRatePerGallon > 0) {
+                        setSelectedEquipmentTypes(prev => 
+                          prev.includes('cart-truck') 
+                            ? prev.filter(t => t !== 'cart-truck')
+                            : [...prev, 'cart-truck']
                         );
                       }
                     }}
-                    disabled={selectedProduct.cartRatePerGallon <= 0}
+                    disabled={!selectedProduct.cartRatePerGallon || selectedProduct.cartRatePerGallon <= 0}
+                  />
+                  <Chip
+                    icon={<BackpackIcon />}
+                    label={`Backpack (${selectedProduct.backpackRatePerGallon || 0} ${selectedProduct.unit}/gal)`}
+                    clickable
+                    color={selectedEquipmentTypes.includes('backpack') ? 'secondary' : 'default'}
+                    variant={selectedEquipmentTypes.includes('backpack') ? 'filled' : 'outlined'}
+                    onClick={() => {
+                      if (selectedProduct.backpackRatePerGallon && selectedProduct.backpackRatePerGallon > 0) {
+                        setSelectedEquipmentTypes(prev => 
+                          prev.includes('backpack') 
+                            ? prev.filter(t => t !== 'backpack')
+                            : [...prev, 'backpack']
+                        );
+                      }
+                    }}
+                    disabled={!selectedProduct.backpackRatePerGallon || selectedProduct.backpackRatePerGallon <= 0}
                   />
                 </Box>
-                {selectedTruckTypes.length === 0 && (
+                {selectedEquipmentTypes.length === 0 && (
                   <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
-                    Please select at least one truck type
+                    Please select at least one equipment type
                   </Typography>
                 )}
               </Box>
@@ -1192,12 +1267,12 @@ const ApplicationManagement: React.FC = () => {
             <Button onClick={() => {
               setOpenProductDialog(false);
               setSelectedProduct(null);
-              setSelectedTruckTypes([]);
+              setSelectedEquipmentTypes([]);
             }}>Cancel</Button>
             <Button 
               onClick={addProductToApplication}
               variant="contained"
-              disabled={!selectedProduct || selectedTruckTypes.length === 0}
+              disabled={!selectedProduct || selectedEquipmentTypes.length === 0}
             >
               Add Product
             </Button>

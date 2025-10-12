@@ -199,6 +199,8 @@ const ProductManagement: React.FC = () => {
         type: editingProduct.type,
         hoseRatePerGallon: editingProduct.hoseRatePerGallon || 0,
         cartRatePerGallon: editingProduct.cartRatePerGallon || 0,
+        backpackRatePerGallon: editingProduct.backpackRatePerGallon || 0,
+        trailerRatePerGallon: editingProduct.trailerRatePerGallon || 0,
         poundsPer1000SqFt: editingProduct.poundsPer1000SqFt || 0,
         poundsPerBag: editingProduct.poundsPerBag || 50,
         unit: editingProduct.unit,
