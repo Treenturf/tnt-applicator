@@ -119,9 +119,11 @@ const AdminPanel: React.FC = () => {
       description: 'Configure kiosk terminals and their settings',
       icon: <Typography sx={{ fontSize: 40 }}>🖥️</Typography>,
       action: () => {
+        console.log('🔘 Kiosk Management card clicked!');
         // Load kiosks and open dialog
         loadKiosks();
         setOpenKioskDialog(true);
+        console.log('📂 Dialog should now be open');
       },
       color: 'secondary.main'
     }
@@ -252,6 +254,9 @@ const AdminPanel: React.FC = () => {
     try {
       setLoading(true);
       
+      console.log('💾 SAVING KIOSK - Current newKiosk state:', JSON.stringify(newKiosk, null, 2));
+      console.log('📦 Products being saved:', newKiosk.availableProducts);
+      
       if (editingKiosk) {
         // Update existing kiosk in Firestore
         const kioskToSave = {
@@ -259,6 +264,9 @@ const AdminPanel: React.FC = () => {
           id: editingKiosk.id, // Keep the original ID
           updatedAt: new Date().toISOString()
         };
+        
+        console.log('✏️ UPDATING kiosk:', kioskToSave.id);
+        console.log('📦 Final products to save:', kioskToSave.availableProducts);
         
         // Save to Firestore using the kiosk ID as document ID
         await setDoc(doc(db, 'kiosks', editingKiosk.id), kioskToSave, { merge: true });
@@ -273,6 +281,10 @@ const AdminPanel: React.FC = () => {
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         };
+        
+        console.log('➕ CREATING new kiosk');
+        console.log('📦 Final products to save:', kioskToSave.availableProducts);
+        
         await addDoc(collection(db, 'kiosks'), kioskToSave);
         setMessage(`Kiosk "${kioskToSave.name}" created successfully! Products assigned: ${kioskToSave.availableProducts.length}`);
       }
@@ -319,21 +331,28 @@ const AdminPanel: React.FC = () => {
     console.log('🔄 Toggle product:', productId, 'checked:', checked);
     console.log('📦 Current availableProducts:', newKiosk.availableProducts);
     
+    const currentProducts = newKiosk.availableProducts || [];
+    let updated: string[];
+    
     if (checked) {
-      const updated = [...newKiosk.availableProducts, productId];
+      // Add product if not already in list
+      updated = currentProducts.includes(productId) 
+        ? currentProducts 
+        : [...currentProducts, productId];
       console.log('✅ Adding product. New list:', updated);
-      setNewKiosk({
-        ...newKiosk,
-        availableProducts: updated
-      });
     } else {
-      const updated = newKiosk.availableProducts.filter(id => id !== productId);
+      // Remove product
+      updated = currentProducts.filter(id => id !== productId);
       console.log('❌ Removing product. New list:', updated);
-      setNewKiosk({
-        ...newKiosk,
-        availableProducts: updated
-      });
     }
+    
+    // Update the state with a completely new object
+    setNewKiosk(prev => ({
+      ...prev,
+      availableProducts: updated
+    }));
+    
+    console.log('💾 State updated with', updated.length, 'products');
   };
 
   // Memoize filtered products to prevent re-renders
@@ -351,6 +370,14 @@ const AdminPanel: React.FC = () => {
       return products;
     }
   }, [products, newKiosk.type]);
+
+  // Log when availableProducts changes
+  useEffect(() => {
+    if (isAddingKiosk || editingKiosk) {
+      console.log('📦 newKiosk.availableProducts changed:', newKiosk.availableProducts);
+      console.log('📝 Form state - isAddingKiosk:', isAddingKiosk, 'editingKiosk:', editingKiosk?.name || 'none');
+    }
+  }, [newKiosk.availableProducts, isAddingKiosk, editingKiosk]);
 
   const handleLogout = async () => {
     try {
@@ -482,6 +509,7 @@ const AdminPanel: React.FC = () => {
             variant="contained"
             startIcon={<AddIcon />}
             onClick={() => {
+              console.log('➕ Add New Kiosk button clicked!');
               setEditingKiosk(null);
               setIsAddingKiosk(true);
               setNewKiosk({
@@ -494,6 +522,7 @@ const AdminPanel: React.FC = () => {
                 units: { primary: 'gallons' },
                 location: ''
               });
+              console.log('✅ isAddingKiosk set to true, newKiosk initialized');
             }}
             sx={{ mb: 3 }}
           >
@@ -560,7 +589,16 @@ const AdminPanel: React.FC = () => {
                     Select which products should be available on this kiosk:
                   </Typography>
                   
-                  <Box sx={{ maxHeight: 200, overflow: 'auto', border: '1px solid', borderColor: 'grey.300', borderRadius: 1, p: 1 }}>
+                  <Box 
+                    sx={{ 
+                      maxHeight: 200, 
+                      overflow: 'auto', 
+                      border: '1px solid', 
+                      borderColor: 'grey.300', 
+                      borderRadius: 1, 
+                      p: 1
+                    }}
+                  >
                     {products.length === 0 ? (
                       <Typography color="text.secondary">No products available. Please add products first.</Typography>
                     ) : (
@@ -574,29 +612,41 @@ const AdminPanel: React.FC = () => {
                           </Typography>
                         ) : (
                           filteredProducts.map((product) => (
-                            <Box key={product.id} sx={{ display: 'flex', alignItems: 'center', py: 0.5 }}>
-                              <FormControlLabel
-                                key={`checkbox-${product.id}`}
-                                control={
-                                  <Checkbox
-                                    checked={newKiosk.availableProducts.includes(product.id)}
-                                    onChange={(e) => {
-                                      console.log('📌 Checkbox clicked!', product.id, e.target.checked);
-                                      handleProductToggle(product.id, e.target.checked);
-                                    }}
-                                  />
-                                }
-                                label={
-                                  <Box>
-                                    <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-                                      {product.name}
-                                    </Typography>
-                                    <Typography variant="caption" color="text.secondary">
-                                      Type: {product.type} | Category: {product.category}
-                                    </Typography>
-                                  </Box>
-                                }
+                            <Box 
+                              key={product.id} 
+                              sx={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                py: 0.5,
+                                px: 1,
+                                cursor: 'pointer',
+                                '&:hover': { bgcolor: 'action.hover' },
+                                borderRadius: 1
+                              }}
+                            >
+                              <Checkbox
+                                checked={newKiosk.availableProducts?.includes(product.id) || false}
+                                onChange={(e) => {
+                                  console.log('📌 Checkbox changed!', product.name, product.id, 'New state:', e.target.checked);
+                                  handleProductToggle(product.id, e.target.checked);
+                                }}
                               />
+                              <Box 
+                                sx={{ ml: 1, flexGrow: 1, cursor: 'pointer' }}
+                                onClick={() => {
+                                  const isCurrentlyChecked = newKiosk.availableProducts?.includes(product.id) || false;
+                                  const newCheckedState = !isCurrentlyChecked;
+                                  console.log('📌 Label clicked!', product.name, 'Toggle to:', newCheckedState);
+                                  handleProductToggle(product.id, newCheckedState);
+                                }}
+                              >
+                                <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                                  {product.name}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  Type: {product.type}
+                                </Typography>
+                              </Box>
                             </Box>
                           ))
                         )}

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   Container, 
   Typography, 
@@ -17,17 +17,60 @@ import {
   AdminPanelSettings as AdminIcon,
   ExitToApp as LogoutIcon,
   Computer as KioskIcon,
-  Refresh as RefreshIcon
+  Refresh as RefreshIcon,
+  Agriculture as RecipeIcon
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useKiosk } from '../contexts/KioskContext';
 import { useNavigate } from 'react-router-dom';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../firebase';
 
+// Application interface
+interface Application {
+  id: string;
+  name: string;
+  description?: string;
+  category: string;
+  products: any[];
+  isActive: boolean;
+  isDefault?: boolean;
+  availableKiosks?: ('specialty' | 'mixed' | 'fertilizer')[];
+}
 
 const Dashboard: React.FC = () => {
   const { user, logout } = useAuth();
   const { currentKiosk, refreshKioskConfig } = useKiosk();
   const navigate = useNavigate();
+  const [applications, setApplications] = useState<Application[]>([]);
+
+  // Load applications for Specialty Applications kiosk
+  useEffect(() => {
+    if (currentKiosk?.type === 'mixed') {
+      loadApplications();
+    }
+  }, [currentKiosk]);
+
+  const loadApplications = async () => {
+    try {
+      const applicationsSnapshot = await getDocs(collection(db, 'applications'));
+      const applicationsData = applicationsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Application[];
+      
+      // Filter for active applications available on the current kiosk
+      const availableApplications = applicationsData.filter(app => 
+        app.isActive && 
+        app.availableKiosks?.includes(currentKiosk?.type || 'mixed')
+      );
+      
+      setApplications(availableApplications);
+      console.log('📋 Loaded applications for kiosk:', availableApplications);
+    } catch (error) {
+      console.error('❌ Error loading applications:', error);
+    }
+  };
 
   // Auto-redirect to calculator for fertilizer kiosk (all users including admin)
   useEffect(() => {
@@ -111,7 +154,7 @@ const Dashboard: React.FC = () => {
       ),
       action: () => handleTruckSelection('hose'),
       color: 'primary.main',
-      available: currentKiosk?.type === 'specialty'
+      available: currentKiosk?.type === 'specialty' || currentKiosk?.type === 'mixed'
     },
     {
       title: 'TNT Calculator - Cart Truck',
@@ -132,7 +175,7 @@ const Dashboard: React.FC = () => {
       ),
       action: () => handleTruckSelection('cart'),
       color: 'success.main',
-      available: currentKiosk?.type === 'specialty'
+      available: currentKiosk?.type === 'specialty' || currentKiosk?.type === 'mixed'
     },
     {
       title: 'Dry Fertilizer Calculator',
@@ -148,7 +191,7 @@ const Dashboard: React.FC = () => {
       icon: <ReportsIcon sx={{ fontSize: 40 }} />,
       action: () => navigate('/reports'),
       color: 'info.main',
-      available: user?.role?.toLowerCase() === 'admin' && currentKiosk?.type === 'specialty'
+      available: user?.role?.toLowerCase() === 'admin' && (currentKiosk?.type === 'specialty' || currentKiosk?.type === 'mixed')
     },
     {
       title: 'Admin Panel',
@@ -156,7 +199,7 @@ const Dashboard: React.FC = () => {
       icon: <AdminIcon sx={{ fontSize: 40 }} />,
       action: () => navigate('/admin'),
       color: 'secondary.main',
-      available: user?.role?.toLowerCase() === 'admin' && currentKiosk?.type === 'specialty'
+      available: user?.role?.toLowerCase() === 'admin' && (currentKiosk?.type === 'specialty' || currentKiosk?.type === 'mixed')
     },
     {
       title: 'Debug Database',
@@ -164,7 +207,7 @@ const Dashboard: React.FC = () => {
       icon: <Typography sx={{ fontSize: 40 }}>🔍</Typography>,
       action: () => navigate('/debug'),
       color: 'warning.main',
-      available: user?.role?.toLowerCase() === 'admin' && currentKiosk?.type === 'specialty'
+      available: user?.role?.toLowerCase() === 'admin' && (currentKiosk?.type === 'specialty' || currentKiosk?.type === 'mixed')
     }
   ];
 
@@ -257,9 +300,73 @@ const Dashboard: React.FC = () => {
           </Typography>
         </Box>
 
-        {/* Action Cards - Show for all kiosks */}
+        {/* Action Cards - Show recipe cards for Specialty Applications, standard cards for others */}
         <Grid container spacing={4} justifyContent="center">
-        {actionCards.filter(card => card.available).map((card, index) => (
+        {/* Show application recipe cards for Specialty Applications kiosk */}
+        {currentKiosk?.type === 'mixed' && applications.length > 0 ? (
+          applications.map((app) => (
+            <Grid item xs={12} sm={8} md={6} lg={4} key={app.id}>
+              <Card 
+                sx={{ 
+                  height: '300px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                  '&:hover': {
+                    transform: 'translateY(-4px)',
+                    boxShadow: 4
+                  }
+                }}
+                onClick={() => {
+                  // Navigate to calculator with this application recipe
+                  navigate(`/calculator?application=${app.id}&name=${encodeURIComponent(app.name)}`);
+                }}
+              >
+                <CardContent sx={{ flexGrow: 1, textAlign: 'center', pt: 3, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <Box>
+                    <Box sx={{ color: 'success.main', mb: 2 }}>
+                      <RecipeIcon sx={{ fontSize: 70 }} />
+                    </Box>
+                    <Typography variant="h6" component="h2" gutterBottom>
+                      {app.name}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {app.description || `${app.products.length} products in recipe`}
+                    </Typography>
+                    <Box sx={{ mt: 1 }}>
+                      <Chip 
+                        label={app.category} 
+                        size="small" 
+                        color="primary" 
+                        variant="outlined"
+                      />
+                    </Box>
+                  </Box>
+                </CardContent>
+                <CardActions sx={{ justifyContent: 'center', pb: 3 }}>
+                  <Button 
+                    variant="contained" 
+                    onClick={() => {
+                      navigate(`/calculator?application=${app.id}&name=${encodeURIComponent(app.name)}`);
+                    }}
+                    sx={{ 
+                      minWidth: '160px',
+                      fontSize: '1.2rem',
+                      py: 2,
+                      px: 4,
+                      fontWeight: 'bold'
+                    }}
+                  >
+                    LOAD
+                  </Button>
+                </CardActions>
+              </Card>
+            </Grid>
+          ))
+        ) : (
+          /* Show standard action cards for other kiosk types */
+          actionCards.filter(card => card.available).map((card, index) => (
             <Grid item xs={12} sm={8} md={6} lg={4} key={index}>
               <Card 
                 sx={{ 
@@ -305,8 +412,9 @@ const Dashboard: React.FC = () => {
                 </CardActions>
               </Card>
             </Grid>
-          ))}
-          </Grid>
+          ))
+        )}
+        </Grid>
 
       </Container>
     </>

@@ -32,7 +32,10 @@ import {
   ListItem,
   ListItemText,
   ListItemSecondaryAction,
-  Autocomplete
+  Autocomplete,
+  Checkbox,
+  FormGroup,
+  FormLabel
 } from '@mui/material';
 import { 
   Add as AddIcon,
@@ -79,6 +82,7 @@ interface Application {
   products: ApplicationProduct[];
   isActive: boolean;
   isDefault?: boolean;
+  availableKiosks?: ('specialty' | 'mixed' | 'fertilizer')[]; // Which kiosks can use this recipe
   createdAt?: any;
 }
 
@@ -132,7 +136,8 @@ const ApplicationManagement: React.FC = () => {
     category: 'mixed' as const,
     products: [] as ApplicationProduct[],
     isActive: true,
-    isDefault: false
+    isDefault: false,
+    availableKiosks: ['mixed'] as ('specialty' | 'mixed' | 'fertilizer')[]
   });
 
   // Product selection state
@@ -178,6 +183,7 @@ const ApplicationManagement: React.FC = () => {
       const applicationsData = querySnapshot.docs.map(doc => {
         const data = doc.data();
         console.log('📄 Processing application:', doc.id, data);
+        console.log('  └─ availableKiosks:', data.availableKiosks || 'NOT SET');
         
         // Migrate legacy products to include truckTypes
         const migratedProducts = data.products ? data.products.map(migrateLegacyProduct) : [];
@@ -255,6 +261,7 @@ const ApplicationManagement: React.FC = () => {
         products: newApplication.products || [],
         isActive: newApplication.isActive !== undefined ? newApplication.isActive : true,
         isDefault: newApplication.isDefault !== undefined ? newApplication.isDefault : false,
+        availableKiosks: newApplication.availableKiosks || ['mixed'],
         createdAt: new Date(),
         updatedAt: new Date()
       };
@@ -272,7 +279,8 @@ const ApplicationManagement: React.FC = () => {
         category: 'mixed', 
         products: [], 
         isActive: true,
-        isDefault: false
+        isDefault: false,
+        availableKiosks: ['mixed']
       });
       loadApplications();
     } catch (error) {
@@ -296,7 +304,8 @@ const ApplicationManagement: React.FC = () => {
         category: editingApplication.category,
         products: editingApplication.products,
         isActive: editingApplication.isActive,
-        isDefault: editingApplication.isDefault || false
+        isDefault: editingApplication.isDefault || false,
+        availableKiosks: editingApplication.availableKiosks || ['mixed']
       });
       setMessage('Application updated successfully!');
       setOpenDialog(false);
@@ -354,14 +363,25 @@ const ApplicationManagement: React.FC = () => {
       category: 'mixed', 
       products: [], 
       isActive: true,
-      isDefault: false
+      isDefault: false,
+      availableKiosks: ['mixed']
     });
     setOpenDialog(true);
     console.log('✅ Dialog should now be open');
   };
 
   const openEditDialog = (application: Application) => {
-    setEditingApplication(application);
+    console.log('🔧 Opening edit dialog for application:', application.id);
+    console.log('  └─ Current availableKiosks:', application.availableKiosks);
+    
+    // Ensure availableKiosks is initialized for legacy applications
+    const appWithKiosks = {
+      ...application,
+      availableKiosks: application.availableKiosks || []
+    };
+    
+    console.log('  └─ After initialization:', appWithKiosks.availableKiosks);
+    setEditingApplication(appWithKiosks);
     setOpenDialog(true);
   };
 
@@ -548,6 +568,7 @@ const ApplicationManagement: React.FC = () => {
                     <TableCell>Category</TableCell>
                     <TableCell>Products</TableCell>
                     <TableCell>Truck Compatibility</TableCell>
+                    <TableCell>Available Kiosks</TableCell>
                     <TableCell>Status</TableCell>
                     <TableCell>Actions</TableCell>
                   </TableRow>
@@ -623,6 +644,36 @@ const ApplicationManagement: React.FC = () => {
                         })()}
                       </TableCell>
                       <TableCell>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                          {(application.availableKiosks && application.availableKiosks.length > 0) ? (
+                            application.availableKiosks.map(kiosk => (
+                              <Chip
+                                key={kiosk}
+                                label={
+                                  kiosk === 'specialty' ? 'Standard' :
+                                  kiosk === 'mixed' ? 'Specialty' :
+                                  'Fertilizer'
+                                }
+                                size="small"
+                                color={
+                                  kiosk === 'specialty' ? 'primary' :
+                                  kiosk === 'mixed' ? 'success' :
+                                  'warning'
+                                }
+                                variant="outlined"
+                              />
+                            ))
+                          ) : (
+                            <Chip
+                              label="Not Set"
+                              size="small"
+                              color="default"
+                              variant="outlined"
+                            />
+                          )}
+                        </Box>
+                      </TableCell>
+                      <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <Chip 
                             label={application.isActive ? 'Active' : 'Inactive'} 
@@ -669,7 +720,7 @@ const ApplicationManagement: React.FC = () => {
                   ))}
                   {applications.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={5} sx={{ textAlign: 'center', py: 4 }}>
+                      <TableCell colSpan={7} sx={{ textAlign: 'center', py: 4 }}>
                         <Typography variant="body2" color="text.secondary">
                           No applications found. Create your first application recipe to get started.
                         </Typography>
@@ -771,6 +822,183 @@ const ApplicationManagement: React.FC = () => {
                     <MenuItem value="true">Active</MenuItem>
                     <MenuItem value="false">Inactive</MenuItem>
                   </Select>
+                </FormControl>
+              </Grid>
+
+              {/* Kiosk Availability */}
+              <Grid item xs={12}>
+                <FormControl component="fieldset" variant="standard">
+                  <FormLabel component="legend">Available on Kiosks</FormLabel>
+                  <FormGroup row>
+                    <Box
+                      sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', '&:hover': { bgcolor: 'action.hover' } }}
+                      onClick={() => {
+                        console.log('📌 Specialty Box clicked!');
+                        const currentKiosks = editingApplication?.availableKiosks || newApplication.availableKiosks || [];
+                        const isCurrentlyChecked = currentKiosks.includes('specialty');
+                        const newCheckedState = !isCurrentlyChecked;
+                        console.log(`  └─ Toggling 'specialty' from ${isCurrentlyChecked} to ${newCheckedState}`);
+                        
+                        let newKiosks: ('specialty' | 'mixed' | 'fertilizer')[];
+                        if (newCheckedState) {
+                          newKiosks = [...currentKiosks, 'specialty'];
+                        } else {
+                          newKiosks = currentKiosks.filter(k => k !== 'specialty');
+                        }
+                        
+                        console.log('  └─ New kiosks:', JSON.stringify(newKiosks));
+                        
+                        if (editingApplication) {
+                          setEditingApplication({ ...editingApplication, availableKiosks: newKiosks });
+                          console.log('  └─ Updated editingApplication');
+                        } else {
+                          setNewApplication({ ...newApplication, availableKiosks: newKiosks });
+                          console.log('  └─ Updated newApplication');
+                        }
+                      }}
+                    >
+                      <Checkbox
+                        checked={
+                          (editingApplication?.availableKiosks || newApplication.availableKiosks || []).includes('specialty')
+                        }
+                        onChange={(e) => {
+                          console.log('📌 Specialty Checkbox onChange!', e.target.checked);
+                          e.stopPropagation();
+                          const currentKiosks = editingApplication?.availableKiosks || newApplication.availableKiosks || [];
+                          
+                          let newKiosks: ('specialty' | 'mixed' | 'fertilizer')[];
+                          if (e.target.checked) {
+                            newKiosks = currentKiosks.includes('specialty') 
+                              ? currentKiosks 
+                              : [...currentKiosks, 'specialty'];
+                          } else {
+                            newKiosks = currentKiosks.filter(k => k !== 'specialty');
+                          }
+                          
+                          console.log('  └─ New kiosks:', JSON.stringify(newKiosks));
+                          
+                          if (editingApplication) {
+                            setEditingApplication({ ...editingApplication, availableKiosks: newKiosks });
+                          } else {
+                            setNewApplication({ ...newApplication, availableKiosks: newKiosks });
+                          }
+                        }}
+                      />
+                      <Typography>Standard Applications</Typography>
+                    </Box>
+                    <Box
+                      sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', ml: 2, '&:hover': { bgcolor: 'action.hover' } }}
+                      onClick={() => {
+                        console.log('📌 Mixed Box clicked!');
+                        const currentKiosks = editingApplication?.availableKiosks || newApplication.availableKiosks || [];
+                        const isCurrentlyChecked = currentKiosks.includes('mixed');
+                        const newCheckedState = !isCurrentlyChecked;
+                        console.log(`  └─ Toggling 'mixed' from ${isCurrentlyChecked} to ${newCheckedState}`);
+                        
+                        let newKiosks: ('specialty' | 'mixed' | 'fertilizer')[];
+                        if (newCheckedState) {
+                          newKiosks = [...currentKiosks, 'mixed'];
+                        } else {
+                          newKiosks = currentKiosks.filter(k => k !== 'mixed');
+                        }
+                        
+                        console.log('  └─ New kiosks:', JSON.stringify(newKiosks));
+                        
+                        if (editingApplication) {
+                          setEditingApplication({ ...editingApplication, availableKiosks: newKiosks });
+                          console.log('  └─ Updated editingApplication');
+                        } else {
+                          setNewApplication({ ...newApplication, availableKiosks: newKiosks });
+                          console.log('  └─ Updated newApplication');
+                        }
+                      }}
+                    >
+                      <Checkbox
+                        checked={
+                          (editingApplication?.availableKiosks || newApplication.availableKiosks || []).includes('mixed')
+                        }
+                        onChange={(e) => {
+                          console.log('📌 Mixed Checkbox onChange!', e.target.checked);
+                          e.stopPropagation();
+                          const currentKiosks = editingApplication?.availableKiosks || newApplication.availableKiosks || [];
+                          
+                          let newKiosks: ('specialty' | 'mixed' | 'fertilizer')[];
+                          if (e.target.checked) {
+                            newKiosks = currentKiosks.includes('mixed') 
+                              ? currentKiosks 
+                              : [...currentKiosks, 'mixed'];
+                          } else {
+                            newKiosks = currentKiosks.filter(k => k !== 'mixed');
+                          }
+                          
+                          console.log('  └─ New kiosks:', JSON.stringify(newKiosks));
+                          
+                          if (editingApplication) {
+                            setEditingApplication({ ...editingApplication, availableKiosks: newKiosks });
+                          } else {
+                            setNewApplication({ ...newApplication, availableKiosks: newKiosks });
+                          }
+                        }}
+                      />
+                      <Typography>Specialty Applications</Typography>
+                    </Box>
+                    <Box
+                      sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', ml: 2, '&:hover': { bgcolor: 'action.hover' } }}
+                      onClick={() => {
+                        console.log('📌 Fertilizer Box clicked!');
+                        const currentKiosks = editingApplication?.availableKiosks || newApplication.availableKiosks || [];
+                        const isCurrentlyChecked = currentKiosks.includes('fertilizer');
+                        const newCheckedState = !isCurrentlyChecked;
+                        console.log(`  └─ Toggling 'fertilizer' from ${isCurrentlyChecked} to ${newCheckedState}`);
+                        
+                        let newKiosks: ('specialty' | 'mixed' | 'fertilizer')[];
+                        if (newCheckedState) {
+                          newKiosks = [...currentKiosks, 'fertilizer'];
+                        } else {
+                          newKiosks = currentKiosks.filter(k => k !== 'fertilizer');
+                        }
+                        
+                        console.log('  └─ New kiosks:', JSON.stringify(newKiosks));
+                        
+                        if (editingApplication) {
+                          setEditingApplication({ ...editingApplication, availableKiosks: newKiosks });
+                          console.log('  └─ Updated editingApplication');
+                        } else {
+                          setNewApplication({ ...newApplication, availableKiosks: newKiosks });
+                          console.log('  └─ Updated newApplication');
+                        }
+                      }}
+                    >
+                      <Checkbox
+                        checked={
+                          (editingApplication?.availableKiosks || newApplication.availableKiosks || []).includes('fertilizer')
+                        }
+                        onChange={(e) => {
+                          console.log('📌 Fertilizer Checkbox onChange!', e.target.checked);
+                          e.stopPropagation();
+                          const currentKiosks = editingApplication?.availableKiosks || newApplication.availableKiosks || [];
+                          
+                          let newKiosks: ('specialty' | 'mixed' | 'fertilizer')[];
+                          if (e.target.checked) {
+                            newKiosks = currentKiosks.includes('fertilizer') 
+                              ? currentKiosks 
+                              : [...currentKiosks, 'fertilizer'];
+                          } else {
+                            newKiosks = currentKiosks.filter(k => k !== 'fertilizer');
+                          }
+                          
+                          console.log('  └─ New kiosks:', JSON.stringify(newKiosks));
+                          
+                          if (editingApplication) {
+                            setEditingApplication({ ...editingApplication, availableKiosks: newKiosks });
+                          } else {
+                            setNewApplication({ ...newApplication, availableKiosks: newKiosks });
+                          }
+                        }}
+                      />
+                      <Typography>Dry Fertilizer</Typography>
+                    </Box>
+                  </FormGroup>
                 </FormControl>
               </Grid>
 

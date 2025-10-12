@@ -58,6 +58,8 @@ interface Product {
   // Liquid product properties
   hoseRatePerGallon: number; // Amount per gallon for hose truck
   cartRatePerGallon: number; // Amount per gallon for cart truck
+  backpackRatePerGallon?: number; // Amount per gallon for backpack
+  trailerRatePerGallon?: number; // Amount per gallon for trailer
   // Granular/Fertilizer product properties
   poundsPer1000SqFt?: number; // Application rate in pounds per 1000 square feet
   poundsPerBag?: number; // Weight of each bag in pounds
@@ -81,6 +83,8 @@ const ProductManagement: React.FC = () => {
     type: 'fertilizer' as const,
     hoseRatePerGallon: 0,
     cartRatePerGallon: 0,
+    backpackRatePerGallon: 0,
+    trailerRatePerGallon: 0,
     poundsPer1000SqFt: 0,
     poundsPerBag: 50,
     unit: '',
@@ -152,6 +156,8 @@ const ProductManagement: React.FC = () => {
         type: 'fertilizer', 
         hoseRatePerGallon: 0, 
         cartRatePerGallon: 0,
+        backpackRatePerGallon: 0,
+        trailerRatePerGallon: 0,
         poundsPer1000SqFt: 0,
         poundsPerBag: 50,
         unit: '', 
@@ -230,6 +236,10 @@ const ProductManagement: React.FC = () => {
       type: 'fertilizer', 
       hoseRatePerGallon: 0, 
       cartRatePerGallon: 0,
+      backpackRatePerGallon: 0,
+      trailerRatePerGallon: 0,
+      poundsPer1000SqFt: 0,
+      poundsPerBag: 50,
       unit: '', 
       description: '', 
       isActive: true 
@@ -413,6 +423,8 @@ const ProductManagement: React.FC = () => {
                     <TableCell>Type</TableCell>
                     <TableCell>Hose Rate</TableCell>
                     <TableCell>Cart Rate</TableCell>
+                    <TableCell>Backpack Rate</TableCell>
+                    <TableCell>Trailer Rate</TableCell>
                     <TableCell>Unit</TableCell>
                     <TableCell>Status</TableCell>
                     <TableCell>Actions</TableCell>
@@ -450,6 +462,18 @@ const ProductManagement: React.FC = () => {
                           : ((product as any).ratePerGallon !== undefined ? `${(product as any).ratePerGallon} (old)` : 'N/A')
                         }
                       </TableCell>
+                      <TableCell>
+                        {product.backpackRatePerGallon !== undefined 
+                          ? product.backpackRatePerGallon 
+                          : 'N/A'
+                        }
+                      </TableCell>
+                      <TableCell>
+                        {product.trailerRatePerGallon !== undefined 
+                          ? product.trailerRatePerGallon 
+                          : 'N/A'
+                        }
+                      </TableCell>
                       <TableCell>{product.unit}</TableCell>
                       <TableCell>
                         <Chip 
@@ -478,7 +502,7 @@ const ProductManagement: React.FC = () => {
                   ))}
                   {products.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={7} sx={{ textAlign: 'center', py: 4 }}>
+                      <TableCell colSpan={9} sx={{ textAlign: 'center', py: 4 }}>
                         <Typography variant="body2" color="text.secondary">
                           No products found. Add your first product to get started.
                         </Typography>
@@ -578,6 +602,46 @@ const ProductManagement: React.FC = () => {
               sx={{ mb: 2 }}
               inputProps={{ min: 0, step: 0.1 }}
               helperText="Amount of product needed per gallon for cart truck (0 = not applicable)"
+            />
+
+            <TextField
+              margin="dense"
+              label="Backpack Rate per Gallon"
+              type="number"
+              fullWidth
+              variant="outlined"
+              value={editingProduct ? (editingProduct.backpackRatePerGallon || 0) : newProduct.backpackRatePerGallon}
+              onChange={(e) => {
+                const value = parseFloat(e.target.value) || 0;
+                if (editingProduct) {
+                  setEditingProduct({ ...editingProduct, backpackRatePerGallon: value });
+                } else {
+                  setNewProduct({ ...newProduct, backpackRatePerGallon: value });
+                }
+              }}
+              sx={{ mb: 2 }}
+              inputProps={{ min: 0, step: 0.1 }}
+              helperText="Amount of product needed per gallon for backpack (0 = not applicable)"
+            />
+
+            <TextField
+              margin="dense"
+              label="Trailer Rate per Gallon"
+              type="number"
+              fullWidth
+              variant="outlined"
+              value={editingProduct ? (editingProduct.trailerRatePerGallon || 0) : newProduct.trailerRatePerGallon}
+              onChange={(e) => {
+                const value = parseFloat(e.target.value) || 0;
+                if (editingProduct) {
+                  setEditingProduct({ ...editingProduct, trailerRatePerGallon: value });
+                } else {
+                  setNewProduct({ ...newProduct, trailerRatePerGallon: value });
+                }
+              }}
+              sx={{ mb: 2 }}
+              inputProps={{ min: 0, step: 0.1 }}
+              helperText="Amount of product needed per gallon for trailer (0 = not applicable)"
             />
 
             <TextField

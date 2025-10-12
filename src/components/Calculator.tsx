@@ -204,12 +204,22 @@ const Calculator: React.FC = () => {
       })) as any[];
       
       // Filter for active fertilizer products that have the required poundsPer1000SqFt field
-      const fertilizerProducts = allProducts.filter(p => 
+      let fertilizerProducts = allProducts.filter(p => 
         p.isActive && 
         (p.type === 'fertilizer' || p.type === 'granular') &&
         p.poundsPer1000SqFt !== undefined && 
         p.poundsPer1000SqFt > 0
       );
+      
+      // If kiosk has specific products assigned, filter to only those
+      if (currentKiosk?.availableProducts && currentKiosk.availableProducts.length > 0) {
+        console.log('🔒 Filtering products for kiosk:', currentKiosk.name);
+        console.log('  └─ Available product IDs:', currentKiosk.availableProducts);
+        fertilizerProducts = fertilizerProducts.filter(p => 
+          currentKiosk.availableProducts.includes(p.id)
+        );
+        console.log('  └─ Filtered to', fertilizerProducts.length, 'products');
+      }
       
       console.log('📦 Loaded fertilizer products:', fertilizerProducts);
       setProducts(fertilizerProducts);

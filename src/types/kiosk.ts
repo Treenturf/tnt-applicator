@@ -1,3 +1,6 @@
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase';
+
 export interface KioskConfig {
   id: string;
   name: string;
@@ -58,16 +61,6 @@ export const KIOSK_TYPES = {
 export const DEFAULT_KIOSKS: KioskConfig[] = [
   {
     id: 'main-terminal',
-    name: 'Specialty Applications',
-    type: 'mixed',
-    description: 'Primary loading station with all products',
-    availableProducts: [], // Will be populated with all products
-    defaultTruckTypes: ['hose', 'cart'],
-    calculationMode: 'both',
-    units: { primary: 'gallons', secondary: 'pounds' }
-  },
-  {
-    id: 'specialty-kiosk',
     name: 'Standard Applications',
     type: 'specialty',
     description: 'Liquid chemicals and herbicides only',
@@ -75,6 +68,16 @@ export const DEFAULT_KIOSKS: KioskConfig[] = [
     defaultTruckTypes: ['hose', 'cart'],
     calculationMode: 'liquid',
     units: { primary: 'gallons' }
+  },
+  {
+    id: 'specialty-kiosk',
+    name: 'Specialty Applications',
+    type: 'mixed',
+    description: 'Primary loading station with all products',
+    availableProducts: [], // Will be populated with all products
+    defaultTruckTypes: ['hose', 'cart'],
+    calculationMode: 'both',
+    units: { primary: 'gallons', secondary: 'pounds' }
   },
   {
     id: 'fertilizer-kiosk',
@@ -102,16 +105,28 @@ export const getCurrentKioskConfig = async (): Promise<KioskConfig | null> => {
   const kioskId = getCurrentKioskId();
   if (!kioskId) return null;
   
-  // Check admin-configured kiosks first
-  const adminKiosks = localStorage.getItem('tnt-admin-kiosks');
-  if (adminKiosks) {
-    const kiosks = JSON.parse(adminKiosks);
-    const found = kiosks.find((k: KioskConfig) => k.id === kioskId);
-    if (found) return found;
+  try {
+    // Load from Firestore first
+    const kioskDoc = await getDoc(doc(db, 'kiosks', kioskId));
+    if (kioskDoc.exists()) {
+      const firestoreData = { id: kioskDoc.id, ...kioskDoc.data() } as KioskConfig;
+      console.log('📥 Loaded kiosk from Firestore:', firestoreData);
+      return firestoreData;
+    }
+    
+    // Fallback to default kiosks
+    const defaultKiosk = DEFAULT_KIOSKS.find(k => k.id === kioskId);
+    if (defaultKiosk) {
+      console.log('📋 Using default kiosk config:', defaultKiosk);
+      return defaultKiosk;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('❌ Error loading kiosk from Firestore:', error);
+    // Fallback to default kiosks on error
+    return DEFAULT_KIOSKS.find(k => k.id === kioskId) || null;
   }
-  
-  // Fallback to default kiosks
-  return DEFAULT_KIOSKS.find(k => k.id === kioskId) || null;
 };
 
 export const getKioskProducts = (kioskConfig: KioskConfig, allProducts: any[]): any[] => {
