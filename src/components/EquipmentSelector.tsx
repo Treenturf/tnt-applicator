@@ -17,10 +17,12 @@ import {
   Backpack as BackpackIcon
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
+import { useKiosk } from '../contexts/KioskContext';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 const EquipmentSelector: React.FC = () => {
   const { user } = useAuth();
+  const { currentKiosk } = useKiosk();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   
@@ -36,9 +38,15 @@ const EquipmentSelector: React.FC = () => {
     navigate('/dashboard');
   };
 
+  // Get theme color based on kiosk type
+  const getThemeColor = () => {
+    if (currentKiosk?.type === 'mixed' || currentKiosk?.id === 'specialty-kiosk') return '#c62828'; // Red for specialty
+    return 'success.main'; // Default green
+  };
+
   return (
     <>
-      <AppBar position="static" sx={{ bgcolor: 'success.main' }}>
+      <AppBar position="static" sx={{ bgcolor: getThemeColor() }}>
         <Toolbar sx={{ justifyContent: 'space-between' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <Button
@@ -64,7 +72,7 @@ const EquipmentSelector: React.FC = () => {
                 {user?.name}
               </Typography>
               <Typography variant="caption">
-                {user?.role?.toLowerCase() === 'admin' ? 'Administrator' : ''} Applicator Code: {user?.userCode}
+                {user?.role?.toLowerCase() === 'admin' ? 'Admin' : 'Applicator'}
               </Typography>
             </Box>
           </Box>
@@ -73,7 +81,7 @@ const EquipmentSelector: React.FC = () => {
       
       <Container maxWidth="md" sx={{ mt: 4, mb: 4, px: 3 }}>
         <Box sx={{ mb: 6, textAlign: 'center' }}>
-          <Typography variant="h3" component="h1" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+          <Typography variant="h3" component="h1" gutterBottom sx={{ fontWeight: 'bold', color: getThemeColor() }}>
             {applicationName || 'Application Recipe'}
           </Typography>
           <Typography variant="h5" color="text.secondary">
@@ -99,14 +107,11 @@ const EquipmentSelector: React.FC = () => {
               onClick={() => handleEquipmentSelection('trailer')}
             >
               <CardContent sx={{ flexGrow: 1, textAlign: 'center', pt: 4, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <Box sx={{ color: 'primary.main', mb: 3 }}>
+                <Box sx={{ color: getThemeColor(), mb: 3 }}>
                   <TrailerIcon sx={{ fontSize: 100 }} />
                 </Box>
                 <Typography variant="h4" component="h2" gutterBottom sx={{ fontWeight: 'bold' }}>
                   Trailer
-                </Typography>
-                <Typography variant="body1" color="text.secondary">
-                  Large capacity equipment for extensive coverage
                 </Typography>
               </CardContent>
               <CardActions sx={{ justifyContent: 'center', pb: 4 }}>
@@ -149,10 +154,7 @@ const EquipmentSelector: React.FC = () => {
                   <BackpackIcon sx={{ fontSize: 100 }} />
                 </Box>
                 <Typography variant="h4" component="h2" gutterBottom sx={{ fontWeight: 'bold' }}>
-                  Backpack
-                </Typography>
-                <Typography variant="body1" color="text.secondary">
-                  Portable equipment for precise spot treatment
+                  Back Pack
                 </Typography>
               </CardContent>
               <CardActions sx={{ justifyContent: 'center', pb: 4 }}>

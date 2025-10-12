@@ -35,7 +35,8 @@ import {
   Add as AddIcon,
   Edit as EditIcon,
   Close as CloseIcon,
-  AdminPanelSettings as AdminIcon
+  AdminPanelSettings as AdminIcon,
+  Logout as LogoutIcon
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useKiosk } from '../contexts/KioskContext';
@@ -219,6 +220,8 @@ const AdminPanel: React.FC = () => {
             const saved = firestoreKiosks.get(defaultKiosk.id);
             if (saved) {
               console.log('✅ Using saved config for:', defaultKiosk.id);
+              console.log('   Available Products:', saved.availableProducts);
+              console.log('   Product Count:', (saved.availableProducts || []).length);
               return saved;
             }
             console.log('📋 Using default config for:', defaultKiosk.id);
@@ -409,16 +412,24 @@ const AdminPanel: React.FC = () => {
 
   // Memoize filtered products to prevent re-renders
   const filteredProducts = useMemo(() => {
+    console.log('🔍 Filtering products for kiosk type:', newKiosk.type);
+    console.log('📦 Total products available:', products.length);
+    
     if (newKiosk.type === 'fertilizer') {
-      return products.filter(p => p.type === 'fertilizer' || p.type === 'granular');
+      const filtered = products.filter(p => p.category === 'fertilizer');
+      console.log('✅ Filtered fertilizer products:', filtered.length);
+      return filtered;
     } else if (newKiosk.type === 'specialty') {
-      return products.filter(p => 
-        p.type === 'herbicide' || 
-        p.type === 'insecticide' || 
-        p.type === 'spreader-sticker' ||
-        p.type === 'pre-emergent'
+      const filtered = products.filter(p => 
+        p.category === 'herbicide' || 
+        p.category === 'insecticide' || 
+        p.category === 'specialty'
       );
+      console.log('✅ Filtered specialty products:', filtered.length);
+      return filtered;
     } else {
+      // mixed type - show all products
+      console.log('✅ Showing all products for mixed kiosk');
       return products;
     }
   }, [products, newKiosk.type]);
@@ -452,18 +463,30 @@ const AdminPanel: React.FC = () => {
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <AppBar position="static" sx={{ bgcolor: 'primary.main', mb: 4 }}>
         <Toolbar>
+          <Button 
+            color="inherit" 
+            onClick={() => navigate('/dashboard')}
+            sx={{ 
+              mr: 2,
+              bgcolor: 'rgba(255,255,255,0.1)', 
+              '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' }
+            }}
+          >
+            Dashboard
+          </Button>
           <AdminIcon sx={{ mr: 2 }} />
           <Typography variant="h5" component="div" sx={{ flexGrow: 1, fontWeight: 'bold' }}>
             TNT Admin Panel
           </Typography>
           <Button 
             color="inherit" 
-            onClick={() => navigate('/dashboard')}
-            sx={{ mr: 2 }}
+            onClick={handleLogout}
+            startIcon={<LogoutIcon />}
+            sx={{ 
+              bgcolor: 'rgba(255,255,255,0.1)', 
+              '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } 
+            }}
           >
-            Back to Dashboard
-          </Button>
-          <Button color="inherit" onClick={handleLogout}>
             Logout
           </Button>
         </Toolbar>

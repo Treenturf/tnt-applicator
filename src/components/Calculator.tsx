@@ -647,7 +647,7 @@ const Calculator: React.FC = () => {
                     fontSize: '1.2rem',
                     bgcolor: key === 'clear' ? 'error.main' : 
                            key === 'backspace' ? 'warning.main' : 
-                           'primary.main'
+                           themeColor || 'primary.main'
                   }}
                 >
                   {key === 'clear' ? 'Clear' : 
@@ -662,18 +662,31 @@ const Calculator: React.FC = () => {
     );
   };
 
+  // Get theme color based on kiosk type
+  const getThemeColor = () => {
+    if (mode === 'fertilizer') return '#0288d1'; // Sea blue for fertilizer
+    if (currentKiosk?.type === 'mixed' || currentKiosk?.id === 'specialty-kiosk') return '#c62828'; // Red for specialty/mixed
+    return undefined; // Default green for standard applications
+  };
+
+  const themeColor = getThemeColor();
+
   return (
     <>
-      <AppBar position="static">
+      <AppBar position="static" sx={themeColor ? { bgcolor: themeColor } : undefined}>
         <Toolbar>
           {mode !== 'fertilizer' && (
             <Button 
               color="inherit" 
               startIcon={<BackIcon />}
               onClick={() => navigate('/dashboard')}
-              sx={{ mr: 2 }}
+              sx={{ 
+                mr: 2,
+                bgcolor: 'rgba(255,255,255,0.1)', 
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' }
+              }}
             >
-              Back to Dashboard
+              Dashboard
             </Button>
           )}
           <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: mode === 'fertilizer' ? 'center' : 'flex-start' }}>
@@ -682,11 +695,6 @@ const Calculator: React.FC = () => {
                 <TruckIcon sx={{ fontSize: 40 }} />
                 <Typography variant="h6" component="div">
                   Fertilizer Calculator
-                  {currentKiosk && (
-                    <Typography variant="subtitle2" component="div" sx={{ color: 'rgba(255,255,255,0.7)' }}>
-                      🏭 {currentKiosk.name}
-                    </Typography>
-                  )}
                 </Typography>
                 {user?.role?.toLowerCase() === 'admin' && (
                   <Button
@@ -712,11 +720,6 @@ const Calculator: React.FC = () => {
                 <TruckIcon sx={{ mr: 2 }} />
                 <Typography variant="h6" component="div">
                   {mode === 'application' ? 'Application Calculator' : 'TNT Calculator'}
-                  {currentKiosk && (
-                    <Typography variant="subtitle2" component="div" sx={{ color: 'rgba(255,255,255,0.7)' }}>
-                      🏭 {currentKiosk.name}
-                    </Typography>
-                  )}
                 </Typography>
               </>
             )}
@@ -727,7 +730,7 @@ const Calculator: React.FC = () => {
                 {user?.name}
               </Typography>
               <Typography variant="caption">
-                {user?.role?.toLowerCase() === 'admin' ? 'Administrator' : ''} Applicator Code: {user?.userCode}
+                {user?.role?.toLowerCase() === 'admin' ? 'Admin' : 'Applicator'}
               </Typography>
             </Box>
             <Button 
@@ -749,7 +752,7 @@ const Calculator: React.FC = () => {
         {/* Product Selection Cards - Only show in fertilizer mode without pre-selected product */}
         {mode === 'fertilizer' && !preSelectedFertilizer && !selectedProduct && (
           <Box sx={{ mb: 4 }}>
-            <Typography variant="h4" gutterBottom sx={{ textAlign: 'center', fontWeight: 'bold', color: 'primary.main', mb: 3 }}>
+            <Typography variant="h4" gutterBottom sx={{ textAlign: 'center', fontWeight: 'bold', color: '#0288d1', mb: 3 }}>
               Select Your Fertilizer Product
             </Typography>
             <Grid container spacing={3} justifyContent="center">
@@ -763,11 +766,11 @@ const Calculator: React.FC = () => {
                       cursor: 'pointer',
                       transition: 'all 0.3s ease',
                       border: selectedProduct === product.id ? '3px solid' : '1px solid',
-                      borderColor: selectedProduct === product.id ? 'primary.main' : 'grey.300',
+                      borderColor: selectedProduct === product.id ? '#0288d1' : 'grey.300',
                       '&:hover': {
                         transform: 'translateY(-4px)',
                         boxShadow: 6,
-                        borderColor: 'primary.main'
+                        borderColor: '#0288d1'
                       }
                     }}
                     onClick={() => {
@@ -776,7 +779,7 @@ const Calculator: React.FC = () => {
                     }}
                   >
                     <CardContent sx={{ flexGrow: 1, textAlign: 'center', pt: 3, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                      <Typography variant="h5" component="h2" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                      <Typography variant="h5" component="h2" gutterBottom sx={{ fontWeight: 'bold', color: '#0288d1' }}>
                         {product.name}
                       </Typography>
                       <Typography variant="h6" color="text.secondary" sx={{ mt: 2 }}>
@@ -1018,7 +1021,7 @@ const Calculator: React.FC = () => {
                     onClick={handleCalculate}
                     disabled={!selectedProduct || thousandSqFt <= 0}
                     startIcon={<CalculateIcon />}
-                    sx={{ mt: 2 }}
+                    sx={{ mt: 2, bgcolor: '#0288d1', '&:hover': { bgcolor: '#0277bd' } }}
                   >
                     Calculate Fertilizer
                   </Button>
@@ -1035,7 +1038,7 @@ const Calculator: React.FC = () => {
                       (mode === 'application' ? frontTank <= 0 : (frontTank <= 0 && backTank <= 0))
                     }
                     startIcon={<CalculateIcon />}
-                    sx={{ mt: 2 }}
+                    sx={themeColor ? { mt: 2, bgcolor: themeColor, '&:hover': { bgcolor: themeColor === '#c62828' ? '#b71c1c' : themeColor } } : { mt: 2 }}
                   >
                     Calculate TNT Mix
                   </Button>
@@ -1064,10 +1067,10 @@ const Calculator: React.FC = () => {
                           <Typography variant="body1">
                             Area: {calc.squareFeet?.toLocaleString()} sq ft
                           </Typography>
-                          <Typography variant="h5" color="primary" sx={{ my: 1 }}>
+                          <Typography variant="h3" sx={{ my: 1, fontWeight: 'bold', color: themeColor || '#0288d1' }}>
                             {calc.totalBags} bags needed
                           </Typography>
-                          <Typography variant="body2" color="text.secondary">
+                          <Typography variant="h6" color="text.secondary">
                             {calc.totalPounds?.toFixed(1)} pounds total
                           </Typography>
                         </>
@@ -1079,7 +1082,7 @@ const Calculator: React.FC = () => {
                               <Typography variant="body1" sx={{ fontWeight: 'bold', mb: 1 }}>
                                 Tank: {calc.frontTankGallons} gallons
                               </Typography>
-                              <Typography variant="h5" color="primary" sx={{ textAlign: 'center', my: 2 }}>
+                              <Typography variant="h5" sx={{ textAlign: 'center', my: 2, color: themeColor || 'primary.main' }}>
                                 {calc.ouncesNeeded?.toFixed(2)} oz needed
                               </Typography>
                               <Typography variant="body2" color="text.secondary">
@@ -1092,19 +1095,19 @@ const Calculator: React.FC = () => {
                               <Typography variant="body1" sx={{ fontWeight: 'bold', mb: 1 }}>
                                 {truckType === 'cart' ? 'Driver Tank' : 'Front Tank'}: {calc.frontTankGallons} gallons
                               </Typography>
-                              <Typography variant="h6" color="primary" sx={{ ml: 2, mb: 2 }}>
+                              <Typography variant="h6" sx={{ ml: 2, mb: 2, color: themeColor || 'primary.main' }}>
                                 {calc.frontTankOunces?.toFixed(2)} oz
                               </Typography>
                               
                               <Typography variant="body1" sx={{ fontWeight: 'bold', mb: 1 }}>
                                 {truckType === 'cart' ? 'Passenger Tank' : 'Back Tank'}: {calc.backTankGallons} gallons
                               </Typography>
-                              <Typography variant="h6" color="primary" sx={{ ml: 2 }}>
+                              <Typography variant="h6" sx={{ ml: 2, color: themeColor || 'primary.main' }}>
                                 {calc.backTankOunces?.toFixed(2)} oz
                               </Typography>
                               
                               <Divider sx={{ my: 2 }} />
-                              <Typography variant="h5" color="primary" sx={{ textAlign: 'center' }}>
+                              <Typography variant="h5" sx={{ textAlign: 'center', color: themeColor || 'primary.main' }}>
                                 Total: {calc.ouncesNeeded?.toFixed(2)} oz
                               </Typography>
                             </>
@@ -1114,7 +1117,7 @@ const Calculator: React.FC = () => {
                               <Typography variant="body1">
                                 Gallons: {calc.gallons}
                               </Typography>
-                              <Typography variant="h5" color="primary" sx={{ my: 1 }}>
+                              <Typography variant="h5" sx={{ my: 1, color: themeColor || 'primary.main' }}>
                                 {calc.ouncesNeeded?.toFixed(2)} oz needed
                               </Typography>
                               <Typography variant="body2" color="text.secondary">

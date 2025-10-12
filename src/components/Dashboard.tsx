@@ -17,7 +17,6 @@ import {
   AdminPanelSettings as AdminIcon,
   ExitToApp as LogoutIcon,
   Computer as KioskIcon,
-  Refresh as RefreshIcon,
   Agriculture as RecipeIcon
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
@@ -115,7 +114,7 @@ const Dashboard: React.FC = () => {
       case 'specialty':
         return 'TNT Specialty Applications';
       case 'mixed':
-        return 'TNT Multi-Product Station';
+        return 'Specialty Apps';
       default:
         return 'TNT Loading Zone';
     }
@@ -211,19 +210,35 @@ const Dashboard: React.FC = () => {
     }
   ];
 
+  // Get theme color based on kiosk type
+  const getAppBarColor = () => {
+    if (currentKiosk?.type === 'fertilizer') return '#0288d1'; // Sea blue for fertilizer
+    if (currentKiosk?.type === 'mixed' || currentKiosk?.id === 'specialty-kiosk') return '#c62828'; // Red for specialty
+    return 'primary.main'; // Default green
+  };
+
+  // Get button color for theme consistency
+  const getButtonColor = () => {
+    if (currentKiosk?.type === 'fertilizer') return { bgcolor: '#0288d1', '&:hover': { bgcolor: '#0277bd' } };
+    if (currentKiosk?.type === 'mixed' || currentKiosk?.id === 'specialty-kiosk') return { bgcolor: '#c62828', '&:hover': { bgcolor: '#b71c1c' } };
+    return {}; // Default will use primary.main from theme
+  };
+
+  const buttonColorSx = getButtonColor();
+
   return (
     <>
-      <AppBar position="static" sx={{ bgcolor: 'primary.main' }}>
+      <AppBar position="static" sx={{ bgcolor: getAppBarColor() }}>
         <Toolbar>
           <Box sx={{ flexGrow: 1 }}>
             <Typography variant="h5" component="div" sx={{ fontWeight: 'bold' }}>
               Welcome
             </Typography>
             {currentKiosk && (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mt: 1 }}>
                 <KioskIcon sx={{ color: 'rgba(255,255,255,0.8)' }} />
                 <Chip 
-                  label={`${currentKiosk.name} (${currentKiosk.type.charAt(0).toUpperCase() + currentKiosk.type.slice(1)})`}
+                  label={currentKiosk.name}
                   size="small"
                   sx={{ 
                     bgcolor: 'rgba(255,255,255,0.2)', 
@@ -231,21 +246,6 @@ const Dashboard: React.FC = () => {
                     fontWeight: 'bold'
                   }}
                 />
-                {user?.role?.toLowerCase() === 'admin' && (
-                  <Button
-                    size="small"
-                    color="inherit"
-                    onClick={refreshKioskConfig}
-                    startIcon={<RefreshIcon />}
-                    sx={{ 
-                      color: 'rgba(255,255,255,0.7)',
-                      minWidth: 'auto',
-                      fontSize: '0.75rem'
-                    }}
-                  >
-                    Refresh
-                  </Button>
-                )}
                 {user?.role?.toLowerCase() === 'admin' && (
                   <Button
                     size="small"
@@ -272,7 +272,7 @@ const Dashboard: React.FC = () => {
                 {user?.name}
               </Typography>
               <Typography variant="caption">
-                {user?.role?.toLowerCase() === 'admin' ? 'Administrator' : ''} Applicator Code: {user?.userCode}
+                {user?.role?.toLowerCase() === 'admin' ? 'Admin' : 'Applicator'}
               </Typography>
             </Box>
             <Button 
@@ -334,14 +334,16 @@ const Dashboard: React.FC = () => {
                     <Typography variant="body2" color="text.secondary">
                       {app.description || `${app.products.length} products in recipe`}
                     </Typography>
-                    <Box sx={{ mt: 1 }}>
-                      <Chip 
-                        label={app.category} 
-                        size="small" 
-                        color="primary" 
-                        variant="outlined"
-                      />
-                    </Box>
+                    {app.category && app.category.toLowerCase() !== 'mixed' && (
+                      <Box sx={{ mt: 1 }}>
+                        <Chip 
+                          label={app.category} 
+                          size="small" 
+                          color="primary" 
+                          variant="outlined"
+                        />
+                      </Box>
+                    )}
                   </Box>
                 </CardContent>
                 <CardActions sx={{ justifyContent: 'center', pb: 3 }}>
@@ -355,7 +357,8 @@ const Dashboard: React.FC = () => {
                       fontSize: '1.2rem',
                       py: 2,
                       px: 4,
-                      fontWeight: 'bold'
+                      fontWeight: 'bold',
+                      ...buttonColorSx
                     }}
                   >
                     LOAD
@@ -404,7 +407,8 @@ const Dashboard: React.FC = () => {
                       fontSize: '1.2rem',
                       py: 2,
                       px: 4,
-                      fontWeight: 'bold'
+                      fontWeight: 'bold',
+                      ...buttonColorSx
                     }}
                   >
                     OPEN
