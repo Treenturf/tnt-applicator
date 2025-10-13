@@ -96,14 +96,13 @@ const ProductManagement: React.FC = () => {
     loadProducts();
   }, []);
 
-  // Filter products when kiosk configuration changes
+  // Always show all products in Product Management (admin view)
   useEffect(() => {
-    if (currentKiosk && allProducts.length > 0) {
-      const filteredProducts = getKioskProducts(currentKiosk, allProducts);
-      setProducts(filteredProducts);
-      console.log(`🏭 [${currentKiosk.name}] Filtered products:`, filteredProducts.length, 'of', allProducts.length);
+    if (allProducts.length > 0) {
+      setProducts(allProducts);
+      console.log(`📦 Product Management: Showing all ${allProducts.length} products`);
     }
-  }, [currentKiosk, allProducts]);
+  }, [allProducts]);
 
   const loadProducts = async () => {
     try {
@@ -113,6 +112,11 @@ const ProductManagement: React.FC = () => {
         id: doc.id,
         ...doc.data()
       })) as Product[];
+      
+      console.log('📦 All products loaded:', productsData.length);
+      productsData.forEach(p => {
+        console.log(`  - ${p.name}: type="${p.type}", category="${(p as any).category}"`);
+      });
       
       const sortedProducts = productsData.sort((a, b) => a.name.localeCompare(b.name));
       setAllProducts(sortedProducts);
@@ -356,7 +360,7 @@ const ProductManagement: React.FC = () => {
             <Card>
               <CardContent sx={{ textAlign: 'center', py: 2 }}>
                 <Typography variant="h4" color="success.main">
-                  {products.filter(p => p.type === 'fertilizer' && p.isActive).length}
+                  {products.filter(p => (p.type === 'fertilizer' || (p as any).category === 'fertilizer') && p.isActive).length}
                 </Typography>
                 <Typography variant="caption">Fertilizers</Typography>
               </CardContent>
@@ -366,7 +370,7 @@ const ProductManagement: React.FC = () => {
             <Card>
               <CardContent sx={{ textAlign: 'center', py: 2 }}>
                 <Typography variant="h4" color="warning.main">
-                  {products.filter(p => p.type === 'herbicide' && p.isActive).length}
+                  {products.filter(p => (p.type === 'herbicide' || (p as any).category === 'herbicide') && p.isActive).length}
                 </Typography>
                 <Typography variant="caption">Herbicides</Typography>
               </CardContent>
@@ -376,7 +380,7 @@ const ProductManagement: React.FC = () => {
             <Card>
               <CardContent sx={{ textAlign: 'center', py: 2 }}>
                 <Typography variant="h4" color="error.main">
-                  {products.filter(p => p.type === 'insecticide' && p.isActive).length}
+                  {products.filter(p => (p.type === 'insecticide' || (p as any).category === 'insecticide') && p.isActive).length}
                 </Typography>
                 <Typography variant="caption">Insecticides</Typography>
               </CardContent>
@@ -386,7 +390,7 @@ const ProductManagement: React.FC = () => {
             <Card>
               <CardContent sx={{ textAlign: 'center', py: 2 }}>
                 <Typography variant="h4" color="info.main">
-                  {products.filter(p => p.type === 'pre-emergent' && p.isActive).length}
+                  {products.filter(p => (p.type === 'pre-emergent' || (p as any).category === 'pre-emergent') && p.isActive).length}
                 </Typography>
                 <Typography variant="caption">Pre-emergent</Typography>
               </CardContent>
@@ -396,7 +400,7 @@ const ProductManagement: React.FC = () => {
             <Card>
               <CardContent sx={{ textAlign: 'center', py: 2 }}>
                 <Typography variant="h4" color="secondary.main">
-                  {products.filter(p => p.type === 'spreader-sticker' && p.isActive).length}
+                  {products.filter(p => (p.type === 'spreader-sticker' || (p as any).category === 'spreader-sticker') && p.isActive).length}
                 </Typography>
                 <Typography variant="caption">Spreader Sticker</Typography>
               </CardContent>

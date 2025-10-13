@@ -72,6 +72,8 @@ interface ApplicationProduct {
   productType: string;
   hoseRate: number;
   cartRate: number;
+  trailerRate?: number;
+  backpackRate?: number;
   unit: string;
   equipmentTypes: ('hose-truck' | 'trailer' | 'cart-truck' | 'backpack')[]; // Array to support individual equipment types
   truckTypes?: ('hose' | 'cart')[]; // Legacy field for backward compatibility
@@ -158,6 +160,10 @@ const ApplicationManagement: React.FC = () => {
   const [openProductDialog, setOpenProductDialog] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedEquipmentTypes, setSelectedEquipmentTypes] = useState<('hose-truck' | 'trailer' | 'cart-truck' | 'backpack')[]>([]);
+  
+  // Edit product state
+  const [openEditProductDialog, setOpenEditProductDialog] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<ApplicationProduct | null>(null);
 
   useEffect(() => {
     // Clear any previous error messages and force fresh state
@@ -411,6 +417,8 @@ const ApplicationManagement: React.FC = () => {
       productType: selectedProduct.type,
       hoseRate: selectedProduct.hoseRatePerGallon || 0,
       cartRate: selectedProduct.cartRatePerGallon || 0,
+      trailerRate: selectedProduct.trailerRatePerGallon || 0,
+      backpackRate: selectedProduct.backpackRatePerGallon || 0,
       unit: selectedProduct.unit,
       equipmentTypes: [...selectedEquipmentTypes]
     };
@@ -459,6 +467,45 @@ const ApplicationManagement: React.FC = () => {
         products: newApplication.products.filter(p => p.productId !== productId)
       });
     }
+  };
+
+  const handleEditProductInApplication = (product: ApplicationProduct) => {
+    setEditingProduct(product);
+    setSelectedEquipmentTypes(product.equipmentTypes || []);
+    setOpenEditProductDialog(true);
+  };
+
+  const updateProductInApplication = () => {
+    if (!editingProduct || selectedEquipmentTypes.length === 0) {
+      setMessage('Please select at least one equipment type');
+      return;
+    }
+
+    const updatedProduct: ApplicationProduct = {
+      ...editingProduct,
+      equipmentTypes: [...selectedEquipmentTypes]
+    };
+
+    if (editingApplication) {
+      setEditingApplication({
+        ...editingApplication,
+        products: editingApplication.products.map(p => 
+          p.productId === editingProduct.productId ? updatedProduct : p
+        )
+      });
+    } else {
+      setNewApplication({
+        ...newApplication,
+        products: newApplication.products.map(p => 
+          p.productId === editingProduct.productId ? updatedProduct : p
+        )
+      });
+    }
+
+    setEditingProduct(null);
+    setSelectedEquipmentTypes([]);
+    setOpenEditProductDialog(false);
+    setMessage(`Updated ${editingProduct.productName} equipment types`);
   };
 
   const getCategoryColor = (category: string) => {
@@ -655,8 +702,14 @@ const ApplicationManagement: React.FC = () => {
                                     }
                                   };
                                   
-                                  const getEquipmentColor = (type: string) => {
-                                    return (type === 'hose-truck' || type === 'trailer') ? 'primary' : 'secondary';
+                                  const getEquipmentStyle = (type: string) => {
+                                    switch(type) {
+                                      case 'hose-truck': return { bgcolor: '#0066cc', color: 'white', borderColor: '#0066cc' };   // Bright Blue
+                                      case 'cart-truck': return { bgcolor: '#cc0066', color: 'white', borderColor: '#cc0066' };   // Magenta/Pink
+                                      case 'trailer': return { bgcolor: '#00cc66', color: 'white', borderColor: '#00cc66' };      // Bright Green
+                                      case 'backpack': return { bgcolor: '#ff6600', color: 'white', borderColor: '#ff6600' };     // Bright Orange
+                                      default: return { bgcolor: 'grey.400', color: 'white', borderColor: 'grey.400' };
+                                    }
                                   };
                                   
                                   return (
@@ -665,8 +718,8 @@ const ApplicationManagement: React.FC = () => {
                                       icon={getEquipmentIcon(equipType)}
                                       label={getEquipmentLabel(equipType)}
                                       size="small"
-                                      color={getEquipmentColor(equipType)}
                                       variant="outlined"
+                                      sx={getEquipmentStyle(equipType)}
                                     />
                                   );
                                 })
@@ -1095,8 +1148,14 @@ const ApplicationManagement: React.FC = () => {
                                     }
                                   };
                                   
-                                  const getEquipmentColor = (type: string) => {
-                                    return (type === 'hose-truck' || type === 'trailer') ? 'primary' : 'secondary';
+                                  const getEquipmentStyle = (type: string) => {
+                                    switch(type) {
+                                      case 'hose-truck': return { bgcolor: '#0066cc', color: 'white' };   // Bright Blue
+                                      case 'cart-truck': return { bgcolor: '#cc0066', color: 'white' };   // Magenta/Pink
+                                      case 'trailer': return { bgcolor: '#00cc66', color: 'white' };      // Bright Green
+                                      case 'backpack': return { bgcolor: '#ff6600', color: 'white' };     // Bright Orange
+                                      default: return { bgcolor: 'grey.400', color: 'white' };
+                                    }
                                   };
                                   
                                   return (
@@ -1105,8 +1164,8 @@ const ApplicationManagement: React.FC = () => {
                                       icon={getEquipmentIcon(equipType)}
                                       label={getEquipmentLabel(equipType)}
                                       size="small"
-                                      color={getEquipmentColor(equipType)}
                                       variant="filled"
+                                      sx={getEquipmentStyle(equipType)}
                                     />
                                   );
                                 })}
@@ -1116,6 +1175,13 @@ const ApplicationManagement: React.FC = () => {
                           secondary={`${product.productType} - Hose: ${product.hoseRate} ${product.unit}/gal, Cart: ${product.cartRate} ${product.unit}/gal`}
                         />
                         <ListItemSecondaryAction>
+                          <IconButton 
+                            onClick={() => handleEditProductInApplication(product)}
+                            color="primary"
+                            sx={{ mr: 1 }}
+                          >
+                            <EditIcon />
+                          </IconButton>
                           <IconButton 
                             edge="end" 
                             onClick={() => removeProductFromApplication(product.productId)}
@@ -1275,6 +1341,119 @@ const ApplicationManagement: React.FC = () => {
               disabled={!selectedProduct || selectedEquipmentTypes.length === 0}
             >
               Add Product
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Edit Product Dialog */}
+        <Dialog open={openEditProductDialog} onClose={() => setOpenEditProductDialog(false)} maxWidth="sm" fullWidth>
+          <DialogTitle>Edit Product Equipment</DialogTitle>
+          <DialogContent>
+            {editingProduct && (
+              <Box sx={{ mt: 1 }}>
+                <Typography variant="subtitle1" gutterBottom>
+                  {editingProduct.productName}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2 }}>
+                  {editingProduct.productType}
+                </Typography>
+                
+                <Typography variant="subtitle2" gutterBottom>
+                  Select Equipment Types:
+                </Typography>
+                <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+                  Hose: {editingProduct.hoseRate || 0} | Trailer: {editingProduct.trailerRate || 0} | Cart: {editingProduct.cartRate || 0} | Backpack: {editingProduct.backpackRate || 0} {editingProduct.unit}/gal
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                  <Chip
+                    icon={<HoseTruckIcon />}
+                    label={`Hose Truck (${editingProduct.hoseRate || 0} ${editingProduct.unit}/gal)`}
+                    clickable
+                    color={selectedEquipmentTypes.includes('hose-truck') ? 'primary' : 'default'}
+                    variant={selectedEquipmentTypes.includes('hose-truck') ? 'filled' : 'outlined'}
+                    onClick={() => {
+                      if (editingProduct.hoseRate && editingProduct.hoseRate > 0) {
+                        setSelectedEquipmentTypes(prev => 
+                          prev.includes('hose-truck') 
+                            ? prev.filter(t => t !== 'hose-truck')
+                            : [...prev, 'hose-truck']
+                        );
+                      }
+                    }}
+                    disabled={!editingProduct.hoseRate || editingProduct.hoseRate <= 0}
+                  />
+                  <Chip
+                    icon={<TrailerIcon />}
+                    label={`Trailer (${editingProduct.trailerRate || 0} ${editingProduct.unit}/gal)`}
+                    clickable
+                    color={selectedEquipmentTypes.includes('trailer') ? 'primary' : 'default'}
+                    variant={selectedEquipmentTypes.includes('trailer') ? 'filled' : 'outlined'}
+                    onClick={() => {
+                      if (editingProduct.trailerRate && editingProduct.trailerRate > 0) {
+                        setSelectedEquipmentTypes(prev => 
+                          prev.includes('trailer') 
+                            ? prev.filter(t => t !== 'trailer')
+                            : [...prev, 'trailer']
+                        );
+                      }
+                    }}
+                    disabled={!editingProduct.trailerRate || editingProduct.trailerRate <= 0}
+                  />
+                  <Chip
+                    icon={<CartTruckIcon />}
+                    label={`Cart Truck (${editingProduct.cartRate || 0} ${editingProduct.unit}/gal)`}
+                    clickable
+                    color={selectedEquipmentTypes.includes('cart-truck') ? 'secondary' : 'default'}
+                    variant={selectedEquipmentTypes.includes('cart-truck') ? 'filled' : 'outlined'}
+                    onClick={() => {
+                      if (editingProduct.cartRate && editingProduct.cartRate > 0) {
+                        setSelectedEquipmentTypes(prev => 
+                          prev.includes('cart-truck') 
+                            ? prev.filter(t => t !== 'cart-truck')
+                            : [...prev, 'cart-truck']
+                        );
+                      }
+                    }}
+                    disabled={!editingProduct.cartRate || editingProduct.cartRate <= 0}
+                  />
+                  <Chip
+                    icon={<BackpackIcon />}
+                    label={`Backpack (${editingProduct.backpackRate || 0} ${editingProduct.unit}/gal)`}
+                    clickable
+                    color={selectedEquipmentTypes.includes('backpack') ? 'secondary' : 'default'}
+                    variant={selectedEquipmentTypes.includes('backpack') ? 'filled' : 'outlined'}
+                    onClick={() => {
+                      if (editingProduct.backpackRate && editingProduct.backpackRate > 0) {
+                        setSelectedEquipmentTypes(prev => 
+                          prev.includes('backpack') 
+                            ? prev.filter(t => t !== 'backpack')
+                            : [...prev, 'backpack']
+                        );
+                      }
+                    }}
+                    disabled={!editingProduct.backpackRate || editingProduct.backpackRate <= 0}
+                  />
+                </Box>
+                {selectedEquipmentTypes.length === 0 && (
+                  <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
+                    Please select at least one equipment type
+                  </Typography>
+                )}
+              </Box>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => {
+              setOpenEditProductDialog(false);
+              setEditingProduct(null);
+              setSelectedEquipmentTypes([]);
+            }}>Cancel</Button>
+            <Button 
+              onClick={updateProductInApplication}
+              variant="contained"
+              disabled={selectedEquipmentTypes.length === 0}
+            >
+              Update
             </Button>
           </DialogActions>
         </Dialog>

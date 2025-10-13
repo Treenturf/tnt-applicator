@@ -12,8 +12,7 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions,
-  Alert
+  DialogActions
 } from '@mui/material';
 import {
   Computer as KioskIcon,
@@ -95,19 +94,12 @@ const KioskSelector: React.FC<KioskSelectorProps> = ({ onKioskSelected }) => {
         <Box sx={{ textAlign: 'center', mb: 4 }}>
           <KioskIcon sx={{ fontSize: 60, color: 'primary.main', mb: 2 }} />
           <Typography variant="h3" component="h1" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-            TNT Kiosk Configuration
+            TNT Terminals
           </Typography>
           <Typography variant="h6" color="text.secondary">
-            Select the type of kiosk terminal you're setting up
+            Select the terminal you would like to use
           </Typography>
         </Box>
-
-        <Alert severity="info" sx={{ mb: 4 }}>
-          <Typography variant="body2">
-            This setting will determine which products and calculation methods are available on this terminal.
-            You can change this later in the admin panel if needed.
-          </Typography>
-        </Alert>
 
         <Grid container spacing={3}>
           {DEFAULT_KIOSKS.map((kiosk) => {
@@ -125,24 +117,36 @@ const KioskSelector: React.FC<KioskSelectorProps> = ({ onKioskSelected }) => {
                     transition: 'all 0.3s ease',
                     '&:hover': {
                       boxShadow: 6,
-                      transform: 'translateY(-4px)'
+                      transform: 'translateY(-4px)',
+                      borderColor: typeInfo.color
                     },
-                    position: 'relative'
+                    position: 'relative',
+                    overflow: 'hidden'
                   }}
                   onClick={() => handleKioskSelect(kiosk.id)}
                 >
+                  {/* Colored header bar */}
+                  <Box sx={{ 
+                    height: 8, 
+                    backgroundColor: typeInfo.color,
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0
+                  }} />
+                  
                   {isSelected && (
-                    <Box sx={{ position: 'absolute', top: 8, right: 8 }}>
+                    <Box sx={{ position: 'absolute', top: 16, right: 8 }}>
                       <SelectedIcon sx={{ color: typeInfo.color, fontSize: 30 }} />
                     </Box>
                   )}
                   
-                  <CardContent sx={{ textAlign: 'center', pb: 1 }}>
-                    <Typography sx={{ fontSize: 60, mb: 2 }}>
+                  <CardContent sx={{ textAlign: 'center', pb: 1, pt: 3 }}>
+                    <Typography sx={{ fontSize: 60, mb: 2, filter: `drop-shadow(0 2px 4px ${typeInfo.color}40)` }}>
                       {typeInfo.icon}
                     </Typography>
                     
-                    <Typography variant="h5" component="h2" gutterBottom sx={{ fontWeight: 'bold' }}>
+                    <Typography variant="h5" component="h2" gutterBottom sx={{ fontWeight: 'bold', color: typeInfo.color }}>
                       {kiosk.name}
                     </Typography>
                     
@@ -152,13 +156,9 @@ const KioskSelector: React.FC<KioskSelectorProps> = ({ onKioskSelected }) => {
                         backgroundColor: typeInfo.color, 
                         color: 'white',
                         fontWeight: 'bold',
-                        mb: 2
+                        mb: 3
                       }}
                     />
-                    
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      {kiosk.description}
-                    </Typography>
 
                     <Box sx={{ mb: 2 }}>
                       <Typography variant="caption" display="block" gutterBottom>
@@ -166,7 +166,7 @@ const KioskSelector: React.FC<KioskSelectorProps> = ({ onKioskSelected }) => {
                         {kiosk.units.secondary && ` / ${kiosk.units.secondary}`}
                       </Typography>
                       <Typography variant="caption" display="block">
-                        <strong>Trucks:</strong> {kiosk.defaultTruckTypes.join(', ')}
+                        <strong>Equipment:</strong> {kiosk.defaultTruckTypes.join(', ')}
                       </Typography>
                     </Box>
                   </CardContent>

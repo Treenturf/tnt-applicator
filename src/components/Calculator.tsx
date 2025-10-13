@@ -322,7 +322,7 @@ const Calculator: React.FC = () => {
   };
 
   // TNT calculation logic for hose/cart trucks using default application or selected application
-  const handleTntCalculate = () => {
+  const handleTntCalculate = async () => {
     // Use selectedApplication if in application mode, otherwise use defaultApplication
     const applicationToUse = mode === 'application' ? selectedApplication : defaultApplication;
     
@@ -330,6 +330,19 @@ const Calculator: React.FC = () => {
       console.warn('No application or products found');
       return;
     }
+
+    // Fetch product rates from products collection if missing
+    const productsSnapshot = await getDocs(collection(db, 'products'));
+    const productsMap = new Map();
+    productsSnapshot.docs.forEach(doc => {
+      const data = doc.data();
+      productsMap.set(doc.id, {
+        trailerRatePerGallon: data.trailerRatePerGallon || 0,
+        backpackRatePerGallon: data.backpackRatePerGallon || 0,
+        hoseRatePerGallon: data.hoseRatePerGallon || 0,
+        cartRatePerGallon: data.cartRatePerGallon || 0
+      });
+    });
 
     const results: CalculationResult[] = [];
 
@@ -340,7 +353,20 @@ const Calculator: React.FC = () => {
       
       // Calculate for each product in the application recipe
       applicationToUse.products.forEach((appProduct: any) => {
-        const rate = appProduct.hoseRate || 0; // Use hoseRate for application mode
+        // Get product rates from products collection if missing from application
+        const productRates = productsMap.get(appProduct.productId);
+        
+        // Use equipment-specific rate based on equipment type
+        // Fallback to product rates if not in application
+        let rate = 0;
+        if (equipmentType === 'trailer') {
+          rate = appProduct.trailerRate ?? productRates?.trailerRatePerGallon ?? appProduct.hoseRate ?? 0;
+        } else if (equipmentType === 'backpack') {
+          rate = appProduct.backpackRate ?? productRates?.backpackRatePerGallon ?? 0;
+        } else {
+          rate = appProduct.hoseRate ?? 0; // Fallback
+        }
+        
         const tankOunces = frontTank * rate;
         
         const result: CalculationResult = {
@@ -752,7 +778,7 @@ const Calculator: React.FC = () => {
         {/* Product Selection Cards - Only show in fertilizer mode without pre-selected product */}
         {mode === 'fertilizer' && !preSelectedFertilizer && !selectedProduct && (
           <Box sx={{ mb: 4 }}>
-            <Typography variant="h4" gutterBottom sx={{ textAlign: 'center', fontWeight: 'bold', color: '#0288d1', mb: 3 }}>
+            <Typography variant="h5" gutterBottom sx={{ textAlign: 'center', fontWeight: 'bold', color: '#0288d1', mb: 3 }}>
               Select Your Fertilizer Product
             </Typography>
             <Grid container spacing={3} justifyContent="center">
@@ -798,10 +824,10 @@ const Calculator: React.FC = () => {
           </Box>
         )}
 
-        <Grid container spacing={3}>
+        <Grid container spacing={3} justifyContent="center">
           {/* Only show calculator card in fertilizer mode if a product is selected */}
           {(mode !== 'fertilizer' || selectedProduct) && (
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12} md={8}>
               <Card>
                 <CardContent>
                   <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
@@ -833,6 +859,8 @@ const Calculator: React.FC = () => {
                         sx={{ 
                           color: 'success.contrastText',
                           borderColor: 'success.contrastText',
+                          fontSize: '0.75rem',
+                          padding: '4px 12px',
                           '&:hover': {
                             bgcolor: 'rgba(255,255,255,0.1)',
                             borderColor: 'success.contrastText'
@@ -1010,10 +1038,11 @@ const Calculator: React.FC = () => {
                   </>
                 )}
 
-                {/* Keypad */}
-                {renderKeypad()}
+                {/* Keypad - Only show if no calculations yet */}
+                {calculations.length === 0 && renderKeypad()}
 
-                {mode === 'fertilizer' && (
+                {/* Calculate Buttons - Only show if no calculations yet */}
+                {calculations.length === 0 && mode === 'fertilizer' && (
                   <Button 
                     fullWidth 
                     variant="contained" 
@@ -1026,7 +1055,7 @@ const Calculator: React.FC = () => {
                     Calculate Fertilizer
                   </Button>
                 )}
-                {(mode === 'tnt' || mode === 'application') && (
+                {calculations.length === 0 && (mode === 'tnt' || mode === 'application') && (
                   <Button 
                     fullWidth 
                     variant="contained" 
@@ -1043,121 +1072,91 @@ const Calculator: React.FC = () => {
                     Calculate TNT Mix
                   </Button>
                 )}
-              </CardContent>
-            </Card>
-          </Grid>
-          )}
 
-          {/* Results */}
-          {calculations.length > 0 && (
-            <Grid item xs={12} md={6}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h5" gutterBottom>
-                    {mode === 'application' ? 'Application Mix Requirements' : mode === 'tnt' ? 'TNT Mix Requirements' : 'Fertilizer Requirements'}
-                  </Typography>
+                {/* Results - Show in place of keypad after calculation */}
+                {calculations.length > 0 && (
+                  <Box sx={{ mt: 2 }}>
+                    <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold' }}>
+                      {mode === 'application' ? 'Application Mix Requirements' : mode === 'tnt' ? 'TNT Mix Requirements' : 'Fertilizer Requirements'}
+                    </Typography>
 
-                  {calculations.map((calc, index) => (
-                    <Box key={index} sx={{ mb: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                      <Typography variant="h6" gutterBottom>
-                        {calc.product.name}
-                      </Typography>
-                      {mode === 'fertilizer' ? (
-                        <>
-                          <Typography variant="body1">
-                            Area: {calc.squareFeet?.toLocaleString()} sq ft
-                          </Typography>
-                          <Typography variant="h3" sx={{ my: 1, fontWeight: 'bold', color: themeColor || '#0288d1' }}>
-                            {calc.totalBags} bags needed
-                          </Typography>
-                          <Typography variant="h6" color="text.secondary">
-                            {calc.totalPounds?.toFixed(1)} pounds total
-                          </Typography>
-                        </>
-                      ) : (
-                        <>
-                          {mode === 'application' ? (
-                            // Application mode: Single tank display
-                            <>
-                              <Typography variant="body1" sx={{ fontWeight: 'bold', mb: 1 }}>
-                                Tank: {calc.frontTankGallons} gallons
-                              </Typography>
-                              <Typography variant="h5" sx={{ textAlign: 'center', my: 2, color: themeColor || 'primary.main' }}>
-                                {calc.ouncesNeeded?.toFixed(2)} oz needed
-                              </Typography>
-                              <Typography variant="body2" color="text.secondary">
-                                Rate: {calc.product.hoseRatePerGallon} oz/gal
-                              </Typography>
-                            </>
-                          ) : calc.frontTankGallons !== undefined && calc.backTankGallons !== undefined && calc.backTankGallons > 0 ? (
-                            // TNT mode: Two tanks display
-                            <>
-                              <Typography variant="body1" sx={{ fontWeight: 'bold', mb: 1 }}>
-                                {truckType === 'cart' ? 'Driver Tank' : 'Front Tank'}: {calc.frontTankGallons} gallons
-                              </Typography>
-                              <Typography variant="h6" sx={{ ml: 2, mb: 2, color: themeColor || 'primary.main' }}>
-                                {calc.frontTankOunces?.toFixed(2)} oz
-                              </Typography>
-                              
-                              <Typography variant="body1" sx={{ fontWeight: 'bold', mb: 1 }}>
-                                {truckType === 'cart' ? 'Passenger Tank' : 'Back Tank'}: {calc.backTankGallons} gallons
-                              </Typography>
-                              <Typography variant="h6" sx={{ ml: 2, color: themeColor || 'primary.main' }}>
-                                {calc.backTankOunces?.toFixed(2)} oz
-                              </Typography>
-                              
-                              <Divider sx={{ my: 2 }} />
-                              <Typography variant="h5" sx={{ textAlign: 'center', color: themeColor || 'primary.main' }}>
-                                Total: {calc.ouncesNeeded?.toFixed(2)} oz
-                              </Typography>
-                            </>
-                          ) : (
-                            // Fallback: Single tank display
-                            <>
-                              <Typography variant="body1">
-                                Gallons: {calc.gallons}
-                              </Typography>
-                              <Typography variant="h5" sx={{ my: 1, color: themeColor || 'primary.main' }}>
-                                {calc.ouncesNeeded?.toFixed(2)} oz needed
-                              </Typography>
-                              <Typography variant="body2" color="text.secondary">
-                                Rate: {calc.product.cartRatePerGallon} oz/gal
-                              </Typography>
-                            </>
-                          )}
-                        </>
-                      )}
-                    </Box>
-                  ))}
+                    {calculations.map((calc, index) => (
+                      <Box key={index} sx={{ mb: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                        <Typography variant="h6" gutterBottom>
+                          {calc.product.name}
+                        </Typography>
+                        {mode === 'fertilizer' ? (
+                          <>
+                            <Typography variant="body1">
+                              Area: {calc.squareFeet?.toLocaleString()} sq ft
+                            </Typography>
+                            <Typography variant="h3" sx={{ my: 1, fontWeight: 'bold', color: themeColor || '#0288d1' }}>
+                              {calc.totalBags} bags needed
+                            </Typography>
+                            <Typography variant="h6">
+                              {calc.totalPounds?.toFixed(1)} pounds total
+                            </Typography>
+                          </>
+                        ) : (
+                          <>
+                            {calc.tankSelection === 'hose' && (
+                              <>
+                                <Typography variant="body1">
+                                  Front Tank: {calc.frontTankGallons} gallons = <strong>{calc.frontTankOunces?.toFixed(2)} {calc.product.unit}</strong>
+                                </Typography>
+                                <Typography variant="body1">
+                                  Back Tank: {calc.backTankGallons} gallons = <strong>{calc.backTankOunces?.toFixed(2)} {calc.product.unit}</strong>
+                                </Typography>
+                                <Typography variant="h5" sx={{ mt: 1, fontWeight: 'bold', color: themeColor }}>
+                                  Total: {calc.ouncesNeeded?.toFixed(2)} {calc.product.unit}
+                                </Typography>
+                              </>
+                            )}
+                            {calc.tankSelection === 'cart' && (
+                              <>
+                                <Typography variant="body1">
+                                  Driver Tank: {calc.frontTankGallons} gallons = <strong>{calc.frontTankOunces?.toFixed(2)} {calc.product.unit}</strong>
+                                </Typography>
+                                <Typography variant="body1">
+                                  Passenger Tank: {calc.backTankGallons} gallons = <strong>{calc.backTankOunces?.toFixed(2)} {calc.product.unit}</strong>
+                                </Typography>
+                                <Typography variant="h5" sx={{ mt: 1, fontWeight: 'bold', color: themeColor }}>
+                                  Total: {calc.ouncesNeeded?.toFixed(2)} {calc.product.unit}
+                                </Typography>
+                              </>
+                            )}
+                            {(calc.tankSelection === 'trailer' || calc.tankSelection === 'backpack' || calc.tankSelection === 'application') && (
+                              <>
+                                <Typography variant="body1">
+                                  Tank: {calc.frontTankGallons} gallons
+                                </Typography>
+                                <Typography variant="h5" sx={{ mt: 1, fontWeight: 'bold', color: themeColor }}>
+                                  {calc.ouncesNeeded?.toFixed(2)} {calc.product.unit} needed
+                                </Typography>
+                              </>
+                            )}
+                          </>
+                        )}
+                      </Box>
+                    ))}
 
-                  {mode === 'fertilizer' && (
                     <Button 
                       fullWidth 
                       variant="outlined" 
-                      color="success"
                       size="large"
-                      onClick={handleSaveAndReset}
-                      startIcon={<CalculateIcon />}
-                      sx={{ mt: 3, mb: 2 }}
+                      onClick={() => {
+                        setCalculations([]);
+                        setActiveInput(mode === 'fertilizer' ? 'thousandSqFt' : 'frontTank');
+                      }}
+                      sx={{ mt: 2 }}
                     >
-                      Do Another Calculation
+                      New Calculation
                     </Button>
-                  )}
-
-                  <Button 
-                    fullWidth 
-                    variant="contained" 
-                    color="primary"
-                    size="large"
-                    onClick={handleLogOut}
-                    startIcon={<LogoutIcon />}
-                    sx={{ mt: mode === 'fertilizer' ? 0 : 3 }}
-                  >
-                    Complete & Log Out
-                  </Button>
-                </CardContent>
-              </Card>
-            </Grid>
+                  </Box>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
           )}
         </Grid>
       </Container>

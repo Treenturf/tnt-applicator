@@ -13,7 +13,7 @@ import {
 } from '@mui/material';
 import { 
   ArrowBack as BackIcon,
-  LocalShipping as TrailerIcon,
+  Agriculture as SprayTrailerIcon,
   Backpack as BackpackIcon
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
@@ -106,15 +106,15 @@ const EquipmentSelector: React.FC = () => {
               }}
               onClick={() => handleEquipmentSelection('trailer')}
             >
-              <CardContent sx={{ flexGrow: 1, textAlign: 'center', pt: 4, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <CardContent sx={{ textAlign: 'center', pt: 4, pb: 2, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', minHeight: '240px' }}>
                 <Box sx={{ color: getThemeColor(), mb: 3 }}>
-                  <TrailerIcon sx={{ fontSize: 100 }} />
+                  <SprayTrailerIcon sx={{ fontSize: 80 }} />
                 </Box>
-                <Typography variant="h4" component="h2" gutterBottom sx={{ fontWeight: 'bold' }}>
+                <Typography variant="h5" component="h2" gutterBottom sx={{ fontWeight: 'bold', minHeight: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   Trailer
                 </Typography>
               </CardContent>
-              <CardActions sx={{ justifyContent: 'center', pb: 4 }}>
+              <CardActions sx={{ justifyContent: 'center', pb: 4, mt: 'auto' }}>
                 <Button 
                   variant="contained" 
                   size="large"
@@ -149,15 +149,15 @@ const EquipmentSelector: React.FC = () => {
               }}
               onClick={() => handleEquipmentSelection('backpack')}
             >
-              <CardContent sx={{ flexGrow: 1, textAlign: 'center', pt: 4, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <Box sx={{ color: 'success.main', mb: 3 }}>
-                  <BackpackIcon sx={{ fontSize: 100 }} />
+              <CardContent sx={{ textAlign: 'center', pt: 4, pb: 2, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', minHeight: '240px' }}>
+                <Box sx={{ color: getThemeColor(), mb: 3 }}>
+                  <BackpackIcon sx={{ fontSize: 80 }} />
                 </Box>
-                <Typography variant="h4" component="h2" gutterBottom sx={{ fontWeight: 'bold' }}>
+                <Typography variant="h5" component="h2" gutterBottom sx={{ fontWeight: 'bold', minHeight: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   Back Pack
                 </Typography>
               </CardContent>
-              <CardActions sx={{ justifyContent: 'center', pb: 4 }}>
+              <CardActions sx={{ justifyContent: 'center', pb: 4, mt: 'auto' }}>
                 <Button 
                   variant="contained" 
                   size="large"

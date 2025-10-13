@@ -7,7 +7,7 @@ export interface KioskConfig {
   type: 'specialty' | 'fertilizer' | 'mixed';
   description: string;
   availableProducts: string[]; // Product IDs
-  defaultTruckTypes: ('hose' | 'cart')[];
+  defaultTruckTypes: ('hose' | 'cart' | 'trailer' | 'backpack')[];
   calculationMode: 'liquid' | 'granular' | 'both';
   units: {
     primary: 'gallons' | 'pounds' | 'bags';
@@ -36,7 +36,7 @@ export const KIOSK_TYPES = {
     name: 'Standard Applications',
     description: 'Liquid chemicals, herbicides, insecticides',
     icon: '🧪',
-    color: '#e91e63',
+    color: '#4caf50',
     defaultUnits: 'gallons',
     truckTypes: ['hose', 'cart']
   },
@@ -44,7 +44,7 @@ export const KIOSK_TYPES = {
     name: 'Dry Fertilizer',
     description: 'Granular products, measured in bags/pounds', 
     icon: '🌾',
-    color: '#4caf50',
+    color: '#0288d1',
     defaultUnits: 'bags',
     truckTypes: ['cart']
   },
@@ -52,7 +52,7 @@ export const KIOSK_TYPES = {
     name: 'Mixed Operations',
     description: 'Both liquid and granular products',
     icon: '🚛',
-    color: '#2196f3',
+    color: '#c62828',
     defaultUnits: 'gallons',
     truckTypes: ['hose', 'cart']
   }
@@ -75,7 +75,7 @@ export const DEFAULT_KIOSKS: KioskConfig[] = [
     type: 'mixed',
     description: 'Primary loading station with all products',
     availableProducts: [], // Will be populated with all products
-    defaultTruckTypes: ['hose', 'cart'],
+    defaultTruckTypes: ['trailer', 'backpack'],
     calculationMode: 'both',
     units: { primary: 'gallons', secondary: 'pounds' }
   },
@@ -147,7 +147,7 @@ export const getKioskProducts = (kioskConfig: KioskConfig, allProducts: any[]): 
       return product.isActive !== false;
     }
     if (kioskConfig.type === 'fertilizer') {
-      return product.type === 'fertilizer';
+      return product.type === 'fertilizer' || product.category === 'fertilizer';
     }
     return true;
   });
