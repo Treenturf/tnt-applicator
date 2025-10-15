@@ -84,6 +84,7 @@ interface Application {
   name: string;
   description?: string;
   category: 'fertilizer' | 'herbicide' | 'insecticide' | 'pre-emergent' | 'spreader-sticker' | 'mixed';
+  applicationCategory?: 'trees' | 'other'; // New field for Trees vs Other categorization
   products: ApplicationProduct[];
   isActive: boolean;
   isDefault?: boolean;
@@ -150,6 +151,7 @@ const ApplicationManagement: React.FC = () => {
     name: '',
     description: '',
     category: 'mixed' as const,
+    applicationCategory: undefined as 'trees' | 'other' | undefined,
     products: [] as ApplicationProduct[],
     isActive: true,
     isDefault: false,
@@ -278,6 +280,7 @@ const ApplicationManagement: React.FC = () => {
         name: newApplication.name || '',
         description: newApplication.description || '',
         category: newApplication.category || 'mixed',
+        applicationCategory: newApplication.applicationCategory || undefined,
         products: newApplication.products || [],
         isActive: newApplication.isActive !== undefined ? newApplication.isActive : true,
         isDefault: newApplication.isDefault !== undefined ? newApplication.isDefault : false,
@@ -297,6 +300,7 @@ const ApplicationManagement: React.FC = () => {
         name: '', 
         description: '', 
         category: 'mixed', 
+        applicationCategory: undefined,
         products: [], 
         isActive: true,
         isDefault: false,
@@ -322,10 +326,12 @@ const ApplicationManagement: React.FC = () => {
         name: editingApplication.name,
         description: editingApplication.description,
         category: editingApplication.category,
+        applicationCategory: editingApplication.applicationCategory,
         products: editingApplication.products,
         isActive: editingApplication.isActive,
         isDefault: editingApplication.isDefault || false,
-        availableKiosks: editingApplication.availableKiosks || ['mixed']
+        availableKiosks: editingApplication.availableKiosks || ['mixed'],
+        updatedAt: new Date()
       });
       setMessage('Application updated successfully!');
       setOpenDialog(false);
@@ -380,7 +386,8 @@ const ApplicationManagement: React.FC = () => {
     setNewApplication({ 
       name: '', 
       description: '', 
-      category: 'mixed', 
+      category: 'mixed',
+      applicationCategory: undefined, 
       products: [], 
       isActive: true,
       isDefault: false,
@@ -917,6 +924,69 @@ const ApplicationManagement: React.FC = () => {
                 </FormControl>
               </Grid>
 
+              {/* Application Category (Trees vs Other) */}
+              <Grid item xs={12}>
+                <FormControl component="fieldset" variant="standard">
+                  <FormLabel component="legend">Application Category (for Specialty Apps)</FormLabel>
+                  <FormGroup row>
+                    <Box
+                      sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', mr: 3, '&:hover': { bgcolor: 'action.hover' } }}
+                      onClick={() => {
+                        if (editingApplication) {
+                          setEditingApplication({ ...editingApplication, applicationCategory: 'trees' });
+                        } else {
+                          setNewApplication({ ...newApplication, applicationCategory: 'trees' });
+                        }
+                      }}
+                    >
+                      <Checkbox
+                        checked={
+                          (editingApplication?.applicationCategory || newApplication.applicationCategory) === 'trees'
+                        }
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          if (e.target.checked) {
+                            if (editingApplication) {
+                              setEditingApplication({ ...editingApplication, applicationCategory: 'trees' });
+                            } else {
+                              setNewApplication({ ...newApplication, applicationCategory: 'trees' });
+                            }
+                          }
+                        }}
+                      />
+                      <Typography>Trees</Typography>
+                    </Box>
+                    <Box
+                      sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', '&:hover': { bgcolor: 'action.hover' } }}
+                      onClick={() => {
+                        if (editingApplication) {
+                          setEditingApplication({ ...editingApplication, applicationCategory: 'other' });
+                        } else {
+                          setNewApplication({ ...newApplication, applicationCategory: 'other' });
+                        }
+                      }}
+                    >
+                      <Checkbox
+                        checked={
+                          (editingApplication?.applicationCategory || newApplication.applicationCategory) === 'other'
+                        }
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          if (e.target.checked) {
+                            if (editingApplication) {
+                              setEditingApplication({ ...editingApplication, applicationCategory: 'other' });
+                            } else {
+                              setNewApplication({ ...newApplication, applicationCategory: 'other' });
+                            }
+                          }
+                        }}
+                      />
+                      <Typography>Other</Typography>
+                    </Box>
+                  </FormGroup>
+                </FormControl>
+              </Grid>
+
               {/* Kiosk Availability */}
               <Grid item xs={12}>
                 <FormControl component="fieldset" variant="standard">
@@ -1032,7 +1102,7 @@ const ApplicationManagement: React.FC = () => {
                           }
                         }}
                       />
-                      <Typography>Specialty Applications</Typography>
+                      <Typography>Specialty Apps</Typography>
                     </Box>
                     <Box
                       sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', ml: 2, '&:hover': { bgcolor: 'action.hover' } }}

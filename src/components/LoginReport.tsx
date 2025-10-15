@@ -153,10 +153,10 @@ const LoginReport: React.FC = () => {
             startIcon={<BackIcon />}
             sx={{ mr: 2 }}
           >
-            Back to Reports Dashboard
+            Back
           </Button>
           <LoginIcon sx={{ mr: 2 }} />
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+          <Typography variant="h6" component="div" sx={{ flexGrow: 1, textAlign: 'center' }}>
             Login Report
           </Typography>
         </Toolbar>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { 
   Container, 
   Typography, 
@@ -13,7 +13,6 @@ import {
   Chip
 } from '@mui/material';
 import { 
-  Assessment as ReportsIcon,
   AdminPanelSettings as AdminIcon,
   ExitToApp as LogoutIcon,
   Computer as KioskIcon,
@@ -24,6 +23,7 @@ import { useKiosk } from '../contexts/KioskContext';
 import { useNavigate } from 'react-router-dom';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
+import CategorySelector from './CategorySelector';
 
 // Application interface
 interface Application {
@@ -31,6 +31,7 @@ interface Application {
   name: string;
   description?: string;
   category: string;
+  applicationCategory?: 'trees' | 'other';
   products: any[];
   isActive: boolean;
   isDefault?: boolean;
@@ -42,8 +43,9 @@ const Dashboard: React.FC = () => {
   const { currentKiosk, refreshKioskConfig } = useKiosk();
   const navigate = useNavigate();
   const [applications, setApplications] = useState<Application[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<'trees' | 'other' | null>(null);
 
-  // Load applications for Specialty Applications kiosk
+  // Load applications for Standard Applications kiosk
   useEffect(() => {
     if (currentKiosk?.type === 'mixed') {
       loadApplications();
@@ -66,6 +68,10 @@ const Dashboard: React.FC = () => {
       
       setApplications(availableApplications);
       console.log('📋 Loaded applications for kiosk:', availableApplications);
+      console.log('📋 Applications with categories:', availableApplications.map(app => ({
+        name: app.name,
+        category: app.applicationCategory
+      })));
     } catch (error) {
       console.error('❌ Error loading applications:', error);
     }
@@ -112,9 +118,9 @@ const Dashboard: React.FC = () => {
       case 'fertilizer':
         return 'TNT Fertilizer Station';
       case 'specialty':
-        return 'TNT Specialty Applications';
+        return 'Standard Applications';
       case 'mixed':
-        return 'Specialty Apps';
+        return 'Specialty Applications';
       default:
         return 'TNT Loading Zone';
     }
@@ -135,8 +141,8 @@ const Dashboard: React.FC = () => {
 
   const actionCards = [
     {
-      title: 'TNT Calculator - Hose Truck',
-      description: 'Calculate application amounts for hose truck',
+      title: 'Hose Truck',
+      description: '',
       icon: (
         <img 
           src="/images/hose-truck.png" 
@@ -156,8 +162,8 @@ const Dashboard: React.FC = () => {
       available: currentKiosk?.type === 'specialty' || currentKiosk?.type === 'mixed'
     },
     {
-      title: 'TNT Calculator - Cart Truck',
-      description: 'Calculate application amounts for cart truck',
+      title: 'Cart Truck',
+      description: '',
       icon: (
         <img 
           src="/images/cart-truck.png" 
@@ -185,27 +191,11 @@ const Dashboard: React.FC = () => {
       available: currentKiosk?.type === 'fertilizer'
     },
     {
-      title: 'View Reports',
-      description: 'Check usage reports and activity logs',
-      icon: <ReportsIcon sx={{ fontSize: 40 }} />,
-      action: () => navigate('/reports'),
-      color: 'info.main',
-      available: user?.role?.toLowerCase() === 'admin' && (currentKiosk?.type === 'specialty' || currentKiosk?.type === 'mixed')
-    },
-    {
       title: 'Admin Panel',
       description: 'Manage users and system settings',
       icon: <AdminIcon sx={{ fontSize: 40 }} />,
       action: () => navigate('/admin'),
       color: 'secondary.main',
-      available: user?.role?.toLowerCase() === 'admin' && (currentKiosk?.type === 'specialty' || currentKiosk?.type === 'mixed')
-    },
-    {
-      title: 'Debug Database',
-      description: 'Debug activity logs and data issues',
-      icon: <Typography sx={{ fontSize: 40 }}>🔍</Typography>,
-      action: () => navigate('/debug'),
-      color: 'warning.main',
       available: user?.role?.toLowerCase() === 'admin' && (currentKiosk?.type === 'specialty' || currentKiosk?.type === 'mixed')
     }
   ];
@@ -225,6 +215,22 @@ const Dashboard: React.FC = () => {
   };
 
   const buttonColorSx = getButtonColor();
+
+  // Memoize filtered applications to prevent render loops
+  const filteredApplications = useMemo(() => {
+    if (!selectedCategory) return applications;
+    
+    const filtered = applications.filter(app => app.applicationCategory === selectedCategory);
+    
+    console.log('🔍 Filtering applications:', {
+      selectedCategory,
+      totalApps: applications.length,
+      filteredApps: filtered.length,
+      appsWithCategory: filtered.map(a => ({ name: a.name, category: a.applicationCategory }))
+    });
+    
+    return filtered;
+  }, [applications, selectedCategory]);
 
   return (
     <>
@@ -290,23 +296,63 @@ const Dashboard: React.FC = () => {
         </Toolbar>
       </AppBar>
       
-      <Container maxWidth="md" sx={{ mt: 4, mb: 4, px: 3 }}>
-        <Box sx={{ mb: 6, textAlign: 'center' }}>
-          <Typography variant="h3" component="h1" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-            {getKioskWelcomeMessage()}
-          </Typography>
-          <Typography variant="h5" color="text.secondary">
-            {getSubtitleMessage()}
-          </Typography>
-        </Box>
+      {/* Show CategorySelector for Specialty Apps kiosk if no category selected */}
+      {currentKiosk?.type === 'mixed' && !selectedCategory ? (
+        <CategorySelector onCategorySelected={(category) => {
+          console.log('📂 Category selected:', category);
+          console.log('📋 Total applications:', applications.length);
+          console.log('📋 Applications in this category:', applications.filter(app => app.applicationCategory === category).length);
+          setSelectedCategory(category);
+        }} />
+      ) : (
+        <Container maxWidth="md" sx={{ mt: 4, mb: 4, px: 3 }}>
+          <Box sx={{ mb: 6, textAlign: 'center' }}>
+            <Typography variant="h3" component="h1" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+              {getKioskWelcomeMessage()}
+            </Typography>
+            <Typography variant="h5" color="text.secondary">
+              {getSubtitleMessage()}
+            </Typography>
+            {/* Show selected category for Specialty Apps kiosk */}
+            {currentKiosk?.type === 'mixed' && selectedCategory && (
+              <Box sx={{ mt: 2 }}>
+                <Chip 
+                  label={selectedCategory === 'trees' ? 'Trees' : 'Other'}
+                  size="medium"
+                  color="success"
+                  sx={{ fontWeight: 'bold', fontSize: '1rem' }}
+                  onDelete={() => setSelectedCategory(null)}
+                />
+              </Box>
+            )}
+          </Box>
 
-        {/* Action Cards - Show recipe cards for Specialty Applications, standard cards for others */}
-        <Grid container spacing={4} justifyContent="center">
-        {/* Show application recipe cards for Specialty Applications kiosk */}
-        {currentKiosk?.type === 'mixed' && applications.length > 0 ? (
-          applications.map((app) => (
-            <Grid item xs={12} sm={8} md={6} lg={4} key={app.id}>
-              <Card 
+          {/* Action Cards - Show recipe cards for Standard Applications, standard cards for others */}
+          <Grid container spacing={4} justifyContent="center">
+          {/* Show application recipe cards for Standard Applications kiosk */}
+          {currentKiosk?.type === 'mixed' && applications.length > 0 ? (
+            filteredApplications.length === 0 && selectedCategory ? (
+              <Grid item xs={12}>
+                <Box sx={{ textAlign: 'center', py: 8 }}>
+                  <Typography variant="h5" color="text.secondary" gutterBottom>
+                    No applications found for "{selectedCategory === 'trees' ? 'Trees' : 'Other'}"
+                  </Typography>
+                  <Typography variant="body1" color="text.secondary">
+                    Please mark some applications with this category in the Admin Panel
+                  </Typography>
+                  <Button
+                    variant="outlined"
+                    onClick={() => setSelectedCategory(null)}
+                    sx={{ mt: 3 }}
+                  >
+                    Choose Different Category
+                  </Button>
+                </Box>
+              </Grid>
+            ) : (
+              filteredApplications.map((app) => (
+              <Grid item xs={12} sm={8} md={6} lg={4} key={app.id}>
+                <Card 
                 sx={{ 
                   height: '300px',
                   display: 'flex',
@@ -367,6 +413,7 @@ const Dashboard: React.FC = () => {
               </Card>
             </Grid>
           ))
+            )
         ) : (
           /* Show standard action cards for other kiosk types */
           actionCards.filter(card => card.available).map((card, index) => (
@@ -393,9 +440,11 @@ const Dashboard: React.FC = () => {
                     <Typography variant="h6" component="h2" gutterBottom>
                       {card.title}
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {card.description}
-                    </Typography>
+                    {card.description && (
+                      <Typography variant="body2" color="text.secondary">
+                        {card.description}
+                      </Typography>
+                    )}
                   </Box>
                 </CardContent>
                 <CardActions sx={{ justifyContent: 'center', pb: 3 }}>
@@ -420,7 +469,8 @@ const Dashboard: React.FC = () => {
         )}
         </Grid>
 
-      </Container>
+        </Container>
+      )}
     </>
   );
 };

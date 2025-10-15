@@ -20,7 +20,11 @@ import {
   Alert,
   AppBar,
   Toolbar,
-  Chip
+  Chip,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
 } from '@mui/material';
 import {
   ArrowBack as BackIcon,
@@ -68,6 +72,8 @@ const ProductTotals: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
+  const [selectedProduct, setSelectedProduct] = useState<string>('');
+  const [availableProducts, setAvailableProducts] = useState<string[]>([]);
   const [currentComparisonYear, setCurrentComparisonYear] = useState<number>(new Date().getFullYear());
   const [previousComparisonYear, setPreviousComparisonYear] = useState<number>(new Date().getFullYear() - 1);
 
@@ -78,7 +84,7 @@ const ProductTotals: React.FC = () => {
   useEffect(() => {
     filterData();
     calculateYTDComparison();
-  }, [usageData, startDate, endDate, currentComparisonYear, previousComparisonYear]);
+  }, [usageData, startDate, endDate, selectedProduct, currentComparisonYear, previousComparisonYear]);
 
   const loadProductUsage = async () => {
     try {
@@ -118,6 +124,11 @@ const ProductTotals: React.FC = () => {
       // Sort by timestamp descending (most recent first)
       usageData.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
       
+      // Extract unique product names for filter dropdown
+      const uniqueProducts = Array.from(new Set(usageData.map(item => item.productName))).sort();
+      console.log('📦 Available products for filter:', uniqueProducts);
+      setAvailableProducts(uniqueProducts);
+      
       setUsageData(usageData);
     } catch (error) {
       console.error('Error loading product usage:', error);
@@ -139,6 +150,10 @@ const ProductTotals: React.FC = () => {
       const end = new Date(endDate);
       end.setHours(23, 59, 59, 999);
       filtered = filtered.filter(item => item.timestamp <= end);
+    }
+    
+    if (selectedProduct) {
+      filtered = filtered.filter(item => item.productName === selectedProduct);
     }
     
     setFilteredData(filtered);
@@ -279,10 +294,10 @@ const ProductTotals: React.FC = () => {
             startIcon={<BackIcon />}
             sx={{ mr: 2 }}
           >
-            Back to Reports Dashboard
+            Back
           </Button>
           <ProductsIcon sx={{ mr: 2 }} />
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+          <Typography variant="h6" component="div" sx={{ flexGrow: 1, textAlign: 'center' }}>
             Total Products Used
           </Typography>
         </Toolbar>
@@ -327,6 +342,24 @@ const ProductTotals: React.FC = () => {
               </Grid>
               
               <Grid item xs={12} sm={6} md={3}>
+                <FormControl fullWidth>
+                  <InputLabel>Product</InputLabel>
+                  <Select
+                    value={selectedProduct}
+                    label="Product"
+                    onChange={(e) => setSelectedProduct(e.target.value)}
+                  >
+                    <MenuItem value="">All Products</MenuItem>
+                    {availableProducts.map((product) => (
+                      <MenuItem key={product} value={product}>
+                        {product}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+              
+              <Grid item xs={12} sm={6} md={3}>
                 <Button
                   fullWidth
                   variant="outlined"
@@ -361,17 +394,26 @@ const ProductTotals: React.FC = () => {
               <Grid container spacing={2}>
                 <Grid item xs={12} sm={4}>
                   <Typography variant="body2" color="text.secondary">
-                    Total Applications: <strong>{filteredData.length}</strong>
+                    Total Applications:{' '}
+                    <Typography component="span" variant="body1" color="text.primary" fontWeight="bold">
+                      {filteredData.length}
+                    </Typography>
                   </Typography>
                 </Grid>
                 <Grid item xs={12} sm={4}>
                   <Typography variant="body2" color="text.secondary">
-                    Unique Products: <strong>{productSummaries.length}</strong>
+                    Unique Products:{' '}
+                    <Typography component="span" variant="body1" color="text.primary" fontWeight="bold">
+                      {productSummaries.length}
+                    </Typography>
                   </Typography>
                 </Grid>
                 <Grid item xs={12} sm={4}>
                   <Typography variant="body2" color="text.secondary">
-                    Total Amount: <strong>{filteredData.reduce((sum, item) => sum + item.amount, 0).toFixed(2)}</strong>
+                    Total Amount:{' '}
+                    <Typography component="span" variant="body1" color="text.primary" fontWeight="bold">
+                      {filteredData.reduce((sum, item) => sum + item.amount, 0).toFixed(2)}
+                    </Typography>
                   </Typography>
                 </Grid>
               </Grid>
@@ -574,7 +616,20 @@ const ProductTotals: React.FC = () => {
                             color={item.truckType.includes('Hose') ? 'primary' : 'secondary'}
                           />
                         </TableCell>
-                        <TableCell>{item.application}</TableCell>
+                        <TableCell>
+                          {item.application && item.application !== 'Individual Products' ? (
+                            <Chip 
+                              label={item.application} 
+                              size="small" 
+                              color="info"
+                              variant="outlined"
+                            />
+                          ) : (
+                            <Typography variant="body2" color="text.secondary">
+                              Individual Products
+                            </Typography>
+                          )}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

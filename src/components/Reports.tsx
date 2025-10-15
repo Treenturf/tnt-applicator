@@ -29,28 +29,28 @@ const Reports: React.FC = () => {
       description: "View today's loading activity and totals by user and application",
       icon: <TodayIcon sx={{ fontSize: 48, color: theme.palette.primary.main }} />,
       route: '/reports/todays-loading',
-      color: '#2e7d32'
+      color: '#1976d2'  // Blue
     },
     {
       title: "Log in Report",
       description: "View user login activity and session information",
       icon: <LoginIcon sx={{ fontSize: 48, color: theme.palette.secondary.main }} />,
       route: '/reports/login-report',
-      color: '#ff6f00'
+      color: '#9c27b0'  // Purple
     },
     {
       title: "Total Products Used",
       description: "View comprehensive product usage totals and statistics",
       icon: <ProductsIcon sx={{ fontSize: 48, color: theme.palette.success.main }} />,
       route: '/reports/product-totals',
-      color: '#388e3c'
+      color: '#2e7d32'  // Green
     },
     {
       title: "Analytics",
       description: "Advanced filtering, detailed logs, and Excel export capabilities",
       icon: <AnalyticsIcon sx={{ fontSize: 48, color: theme.palette.info.main }} />,
       route: '/reports/analytics',
-      color: '#1976d2'
+      color: '#ed6c02'  // Orange
     }
   ];
 
@@ -59,12 +59,13 @@ const Reports: React.FC = () => {
       <Box sx={{ mt: 4, mb: 4 }}>
         {/* Back to Admin Panel Button */}
         <Button
-          variant="outlined"
+          variant="contained"
+          color="info"
           startIcon={<BackIcon />}
           onClick={() => navigate('/admin')}
           sx={{ mb: 3 }}
         >
-          Back to Admin Panel
+          Back
         </Button>
         
         <Typography variant="h4" gutterBottom align="center" sx={{ mb: 4 }}>

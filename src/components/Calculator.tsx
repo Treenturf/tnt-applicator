@@ -491,7 +491,7 @@ const Calculator: React.FC = () => {
             userCode: user?.userCode,
             userName: user?.name,
             kioskId: currentKiosk?.id || 'specialty-kiosk',
-            kioskName: currentKiosk?.name || 'Specialty Applications',
+            kioskName: currentKiosk?.name || 'Standard Applications',
             applicationName: defaultApplication?.name || 'TNT Mix',
             truckType: truckType,
             calculations: calculations.map(calc => ({

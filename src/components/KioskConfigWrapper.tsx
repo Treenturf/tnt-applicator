@@ -35,7 +35,7 @@ const KioskConfigWrapper: React.FC<{ children: React.ReactNode }> = ({ children 
               This kiosk terminal has not been configured yet. Please contact an administrator to set up this terminal.
             </Alert>
             <Typography variant="body1" color="text.secondary">
-              An administrator needs to configure which type of terminal this is (Main Terminal, Specialty Applications, or Bagged Fertilizer).
+              An administrator needs to configure which type of terminal this is (Main Terminal, Standard Applications, or Bagged Fertilizer).
             </Typography>
             <Button 
               variant="outlined" 

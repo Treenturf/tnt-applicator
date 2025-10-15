@@ -599,12 +599,13 @@ const TodaysLoadingTotals: React.FC = () => {
       <Box sx={{ mt: 4, mb: 4 }}>
         {/* Back to Reports Dashboard Button */}
         <Button
-          variant="outlined"
+          variant="contained"
+          color="primary"
           startIcon={<BackIcon />}
           onClick={() => navigate('/reports')}
           sx={{ mb: 3 }}
         >
-          Back to Reports Dashboard
+          Back
         </Button>
         
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 4 }}>

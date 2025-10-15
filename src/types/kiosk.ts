@@ -71,7 +71,7 @@ export const DEFAULT_KIOSKS: KioskConfig[] = [
   },
   {
     id: 'specialty-kiosk',
-    name: 'Specialty Applications',
+    name: 'Specialty Apps',
     type: 'mixed',
     description: 'Primary loading station with all products',
     availableProducts: [], // Will be populated with all products

@@ -130,6 +130,20 @@ const AdminPanel: React.FC = () => {
         console.log('📂 Dialog should now be open');
       },
       color: 'secondary.main'
+    },
+    {
+      title: 'View Reports',
+      description: 'Check usage reports and activity logs',
+      icon: <Typography sx={{ fontSize: 40 }}>📊</Typography>,
+      action: () => navigate('/reports'),
+      color: 'info.main'
+    },
+    {
+      title: 'Debug Database',
+      description: 'Debug activity logs and data issues',
+      icon: <Typography sx={{ fontSize: 40 }}>🔍</Typography>,
+      action: () => navigate('/debug'),
+      color: 'warning.main'
     }
   ];
 

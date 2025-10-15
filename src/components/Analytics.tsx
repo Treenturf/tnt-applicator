@@ -204,7 +204,7 @@ const Reports: React.FC = () => {
     const totals: ProductTotals = {};
 
     logs.forEach(log => {
-      if (log.action === 'Calculate' && log.products) {
+      if (log.action === 'application_calculated' && log.products) {
         log.products.forEach(product => {
           if (!totals[product.name]) {
             totals[product.name] = {
@@ -274,16 +274,43 @@ const Reports: React.FC = () => {
     // Create workbook
     const wb = XLSX.utils.book_new();
 
+    // Helper function to format tank selection details
+    const formatTankDetails = (log: any) => {
+      const tanks: string[] = [];
+      let total = 0;
+      
+      if (log.frontTankGallons && log.frontTankGallons > 0) {
+        tanks.push(`Front: ${log.frontTankGallons} gal`);
+        total += log.frontTankGallons;
+      }
+      if (log.backTankGallons && log.backTankGallons > 0) {
+        tanks.push(`Back: ${log.backTankGallons} gal`);
+        total += log.backTankGallons;
+      }
+      if (log.driverTankGallons && log.driverTankGallons > 0) {
+        tanks.push(`Driver: ${log.driverTankGallons} gal`);
+        total += log.driverTankGallons;
+      }
+      if (log.passengerTankGallons && log.passengerTankGallons > 0) {
+        tanks.push(`Passenger: ${log.passengerTankGallons} gal`);
+        total += log.passengerTankGallons;
+      }
+      
+      if (tanks.length > 0) {
+        return `${tanks.join(', ')} | Total: ${total} gal`;
+      }
+      return log.tankSelection || '';
+    };
+
     // Activity Logs Sheet
     const logsData = filteredLogs.map(log => ({
       'Date': formatDate(log.timestamp),
       'Time': formatTime(log.timestamp),
       'User': log.userName,
-      'User Code': log.userCode,
       'Action': log.action,
       'Application': log.application || '',
-      'Truck Type': log.truckType || '',
-      'Tank Selection': log.tankSelection || '',
+      'Equipment Type': log.truckType || '',
+      'Tank Details': formatTankDetails(log),
       'Details': log.details
     }));
 
@@ -307,20 +334,40 @@ const Reports: React.FC = () => {
     // Detailed Product Usage Sheet
     const detailedData: any[] = [];
     filteredLogs.forEach(log => {
-      if (log.action === 'Calculate' && log.products) {
+      if (log.action === 'application_calculated' && log.products) {
         log.products.forEach(product => {
+          const tankDetails: string[] = [];
+          let totalGallons = 0;
+          
+          if (product.frontTank && product.frontTank > 0) {
+            tankDetails.push(`Front: ${product.frontTank.toFixed(2)}`);
+            totalGallons += product.frontTank;
+          }
+          if (product.backTank && product.backTank > 0) {
+            tankDetails.push(`Back: ${product.backTank.toFixed(2)}`);
+            totalGallons += product.backTank;
+          }
+          if (product.driverTank && product.driverTank > 0) {
+            tankDetails.push(`Driver: ${product.driverTank.toFixed(2)}`);
+            totalGallons += product.driverTank;
+          }
+          if (product.passengerTank && product.passengerTank > 0) {
+            tankDetails.push(`Passenger: ${product.passengerTank.toFixed(2)}`);
+            totalGallons += product.passengerTank;
+          }
+          
           detailedData.push({
             'Date': formatDate(log.timestamp),
             'Time': formatTime(log.timestamp),
             'User': log.userName,
             'Application': log.application || '',
-            'Truck Type': log.truckType || '',
+            'Equipment Type': log.truckType || '',
             'Product': product.name,
-            'Total Amount': product.amount.toFixed(2),
             'Front Tank': (product.frontTank || 0).toFixed(2),
             'Back Tank': (product.backTank || 0).toFixed(2),
             'Driver Tank': (product.driverTank || 0).toFixed(2),
-            'Passenger Tank': (product.passengerTank || 0).toFixed(2)
+            'Passenger Tank': (product.passengerTank || 0).toFixed(2),
+            'Total Amount': product.amount.toFixed(2)
           });
         });
       }
@@ -351,12 +398,13 @@ const Reports: React.FC = () => {
       <Box sx={{ mt: 4, mb: 4 }}>
         {/* Back to Admin Panel Button */}
         <Button
-          variant="outlined"
+          variant="contained"
+          color="warning"
           startIcon={<BackIcon />}
-          onClick={() => navigate('/admin')}
+          onClick={() => navigate('/reports')}
           sx={{ mb: 2 }}
         >
-          Back to Admin Panel
+          Back
         </Button>
         
         <Typography variant="h4" gutterBottom>
@@ -450,6 +498,7 @@ const Reports: React.FC = () => {
                 <Box display="flex" gap={1}>
                   <Button
                     variant="outlined"
+                    color="warning"
                     onClick={clearFilters}
                     startIcon={<ClearIcon />}
                     sx={{ minWidth: '80px' }}
@@ -458,6 +507,7 @@ const Reports: React.FC = () => {
                   </Button>
                   <Button
                     variant="contained"
+                    color="warning"
                     onClick={loadData}
                     disabled={loading}
                     sx={{ minWidth: '80px' }}
@@ -471,7 +521,7 @@ const Reports: React.FC = () => {
             <Box sx={{ mt: 2 }}>
               <Button
                 variant="contained"
-                color="primary"
+                color="warning"
                 onClick={exportToExcel}
                 startIcon={<ExcelIcon />}
                 disabled={filteredLogs.length === 0}
