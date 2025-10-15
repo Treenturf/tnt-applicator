@@ -308,7 +308,6 @@ const Reports: React.FC = () => {
       'Time': formatTime(log.timestamp),
       'User': log.userName,
       'Action': log.action,
-      'Application': log.application || '',
       'Equipment Type': log.truckType || '',
       'Tank Details': formatTankDetails(log),
       'Details': log.details
@@ -336,37 +335,12 @@ const Reports: React.FC = () => {
     filteredLogs.forEach(log => {
       if (log.action === 'application_calculated' && log.products) {
         log.products.forEach(product => {
-          const tankDetails: string[] = [];
-          let totalGallons = 0;
-          
-          if (product.frontTank && product.frontTank > 0) {
-            tankDetails.push(`Front: ${product.frontTank.toFixed(2)}`);
-            totalGallons += product.frontTank;
-          }
-          if (product.backTank && product.backTank > 0) {
-            tankDetails.push(`Back: ${product.backTank.toFixed(2)}`);
-            totalGallons += product.backTank;
-          }
-          if (product.driverTank && product.driverTank > 0) {
-            tankDetails.push(`Driver: ${product.driverTank.toFixed(2)}`);
-            totalGallons += product.driverTank;
-          }
-          if (product.passengerTank && product.passengerTank > 0) {
-            tankDetails.push(`Passenger: ${product.passengerTank.toFixed(2)}`);
-            totalGallons += product.passengerTank;
-          }
-          
           detailedData.push({
             'Date': formatDate(log.timestamp),
             'Time': formatTime(log.timestamp),
             'User': log.userName,
-            'Application': log.application || '',
             'Equipment Type': log.truckType || '',
             'Product': product.name,
-            'Front Tank': (product.frontTank || 0).toFixed(2),
-            'Back Tank': (product.backTank || 0).toFixed(2),
-            'Driver Tank': (product.driverTank || 0).toFixed(2),
-            'Passenger Tank': (product.passengerTank || 0).toFixed(2),
             'Total Amount': product.amount.toFixed(2)
           });
         });
