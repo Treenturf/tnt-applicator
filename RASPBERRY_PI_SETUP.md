@@ -27,7 +27,10 @@
 
 3. **Set up full-screen kiosk mode**:
    ```bash
-   # Edit the autostart file
+   # First, create the directory if it doesn't exist
+   mkdir -p ~/.config/lxsession/LXDE-pi
+   
+   # Now edit the autostart file
    nano ~/.config/lxsession/LXDE-pi/autostart
    
    # Add these lines:
@@ -84,6 +87,9 @@ sudo systemctl enable nginx
 ### Step 4: Configure Kiosk Mode
 
 ```bash
+# First, create the directory if it doesn't exist
+mkdir -p ~/.config/lxsession/LXDE-pi
+
 # Edit autostart
 nano ~/.config/lxsession/LXDE-pi/autostart
 
