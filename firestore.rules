@@ -1,32 +1,39 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // For custom authentication system (4-digit codes)
-    // Allow read access to users collection for login verification
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Users collection - only authenticated users can read their own data
     match /users/{userId} {
-      allow read: if true; // Allow reading for login verification
-      allow write: if true; // Allow writes for admin functionality
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated(); // Consider restricting this to admin role only
     }
     
-    // Allow read access to products for all users
+    // Products - authenticated users can read, only admins should write
     match /products/{productId} {
-      allow read: if true;
-      allow write: if true; // Allow writes for product management
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated(); // TODO: Add admin role check
     }
     
-    // Allow activity logging
+    // Activity logs - authenticated users can read/write
     match /activityLogs/{logId} {
-      allow read, write: if true;
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
     }
     
-    // Allow applications data
+    // Applications - authenticated users can read/write
     match /applications/{applicationId} {
-      allow read, write: if true;
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
     }
     
-    // Allow kiosks data
+    // Kiosks - authenticated users can read/write
     match /kiosks/{kioskId} {
-      allow read, write: if true;
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
     }
   }
 }
