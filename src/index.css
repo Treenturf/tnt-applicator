@@ -13,6 +13,38 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Touch scrolling optimization */
+* {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+html, body {
+  touch-action: pan-y pan-x;
+  overscroll-behavior: contain;
+}
+
+/* Hide scrollbars but keep functionality */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(155, 155, 155, 0.5) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: rgba(155, 155, 155, 0.5);
+  border-radius: 20px;
+  border: transparent;
+}
+
 a {
   font-weight: 500;
   color: #646cff;

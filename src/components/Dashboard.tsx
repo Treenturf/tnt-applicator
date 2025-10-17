@@ -12,13 +12,6 @@ import {
   CardActions,
   Chip
 } from '@mui/material';
-import { 
-  AdminPanelSettings as AdminIcon,
-  ExitToApp as LogoutIcon,
-  ExitToApp,
-  Computer as KioskIcon,
-  Agriculture as RecipeIcon
-} from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useKiosk } from '../contexts/KioskContext';
 import { useNavigate } from 'react-router-dom';
@@ -163,12 +156,15 @@ const Dashboard: React.FC = () => {
           src="/images/hose-truck.png" 
           alt="Hose Truck" 
           style={{ width: 70, height: 70, objectFit: 'contain' }}
-          onLoad={() => console.log('Hose truck image loaded successfully')}
+          onLoad={() => console.log('✅ Hose truck image loaded')}
           onError={(e) => {
-            console.error('Failed to load hose truck image');
-            // Fallback to icon if image fails to load
-            e.currentTarget.style.display = 'none';
-            e.currentTarget.parentElement!.innerHTML = '<div style="font-size: 70px;">🚛</div>';
+            console.error('❌ Failed to load hose truck image');
+            // Fallback to emoji if image fails
+            const target = e.currentTarget as HTMLImageElement;
+            target.style.display = 'none';
+            if (target.parentElement) {
+              target.parentElement.innerHTML = '<div style="font-size: 70px;">🚛</div>';
+            }
           }}
         />
       ),
@@ -184,12 +180,15 @@ const Dashboard: React.FC = () => {
           src="/images/cart-truck.png" 
           alt="Cart Truck" 
           style={{ width: 70, height: 70, objectFit: 'contain' }}
-          onLoad={() => console.log('Cart truck image loaded successfully')}
+          onLoad={() => console.log('✅ Cart truck image loaded')}
           onError={(e) => {
-            console.error('Failed to load cart truck image');
-            // Fallback to icon if image fails to load
-            e.currentTarget.style.display = 'none';
-            e.currentTarget.parentElement!.innerHTML = '<div style="font-size: 70px;">🚚</div>';
+            console.error('❌ Failed to load cart truck image');
+            // Fallback to emoji if image fails
+            const target = e.currentTarget as HTMLImageElement;
+            target.style.display = 'none';
+            if (target.parentElement) {
+              target.parentElement.innerHTML = '<div style="font-size: 70px;">🚚</div>';
+            }
           }}
         />
       ),
@@ -208,7 +207,7 @@ const Dashboard: React.FC = () => {
     {
       title: 'Admin Panel',
       description: 'Manage users and system settings',
-      icon: <AdminIcon sx={{ fontSize: 40 }} />,
+      icon: <Typography sx={{ fontSize: 40 }}>⚙️</Typography>,
       action: () => navigate('/admin'),
       color: 'secondary.main',
       available: user?.role?.toLowerCase() === 'admin' && (currentKiosk?.type === 'specialty' || currentKiosk?.type === 'mixed')
@@ -257,7 +256,7 @@ const Dashboard: React.FC = () => {
             </Typography>
             {currentKiosk && (
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mt: 1 }}>
-                <KioskIcon sx={{ color: 'rgba(255,255,255,0.8)' }} />
+                <Typography sx={{ fontSize: 20 }}>⬛</Typography>
                 <Chip 
                   label={currentKiosk.name}
                   size="small"
@@ -272,7 +271,6 @@ const Dashboard: React.FC = () => {
                     size="small"
                     color="inherit"
                     onClick={handleChangeKiosk}
-                    startIcon={<KioskIcon />}
                     sx={{ 
                       color: 'rgba(255,255,255,0.9)',
                       minWidth: 'auto',
@@ -300,7 +298,6 @@ const Dashboard: React.FC = () => {
               <Button 
                 color="inherit" 
                 onClick={handleExitKiosk}
-                startIcon={<ExitToApp />}
                 sx={{ 
                   bgcolor: 'rgba(255,255,255,0.1)', 
                   '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } 
@@ -313,7 +310,6 @@ const Dashboard: React.FC = () => {
             <Button 
               color="inherit" 
               onClick={handleLogout}
-              startIcon={<LogoutIcon />}
               sx={{ 
                 bgcolor: 'rgba(255,255,255,0.1)', 
                 '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } 
@@ -401,7 +397,7 @@ const Dashboard: React.FC = () => {
                 <CardContent sx={{ flexGrow: 1, textAlign: 'center', pt: 3, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                   <Box>
                     <Box sx={{ color: 'success.main', mb: 2 }}>
-                      <RecipeIcon sx={{ fontSize: 70 }} />
+                      <Typography sx={{ fontSize: 70 }}>📋</Typography>
                     </Box>
                     <Typography variant="h6" component="h2" gutterBottom>
                       {app.name}

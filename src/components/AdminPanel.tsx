@@ -31,13 +31,7 @@ import {
   FormControlLabel,
   Checkbox
 } from '@mui/material';
-import {
-  Add as AddIcon,
-  Edit as EditIcon,
-  Close as CloseIcon,
-  AdminPanelSettings as AdminIcon,
-  Logout as LogoutIcon
-} from '@mui/icons-material';
+// Using emoji instead of Material-UI icons for better compatibility
 import { useAuth } from '../contexts/AuthContext';
 import { useKiosk } from '../contexts/KioskContext';
 import { useNavigate } from 'react-router-dom';
@@ -100,7 +94,7 @@ const AdminPanel: React.FC = () => {
     {
       title: 'User Management',
       description: 'Manage applicators and administrators',
-      icon: <AdminIcon sx={{ fontSize: 40 }} />,
+      icon: <Typography sx={{ fontSize: 40, fontWeight: 'bold' }}>USERS</Typography>,
       action: () => setOpenUserDialog(true),
       color: 'primary.main'
     },
@@ -488,14 +482,12 @@ const AdminPanel: React.FC = () => {
           >
             Dashboard
           </Button>
-          <AdminIcon sx={{ mr: 2 }} />
           <Typography variant="h5" component="div" sx={{ flexGrow: 1, fontWeight: 'bold' }}>
             TNT Admin Panel
           </Typography>
           <Button 
             color="inherit" 
             onClick={handleLogout}
-            startIcon={<LogoutIcon />}
             sx={{ 
               bgcolor: 'rgba(255,255,255,0.1)', 
               '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } 
@@ -548,7 +540,9 @@ const AdminPanel: React.FC = () => {
             onClick={() => setOpenKioskDialog(false)}
             sx={{ position: 'absolute', right: 8, top: 8 }}
           >
-            <CloseIcon />
+            <Typography sx={{ fontSize: 20, fontWeight: 'bold' }}>
+              ×
+            </Typography>
           </IconButton>
         </DialogTitle>
         <DialogContent dividers>
@@ -588,7 +582,6 @@ const AdminPanel: React.FC = () => {
                         <Button
                           variant="outlined"
                           size="small"
-                          startIcon={<EditIcon />}
                           onClick={() => handleEditKiosk(kiosk)}
                         >
                           Edit
@@ -603,7 +596,6 @@ const AdminPanel: React.FC = () => {
 
           <Button
             variant="contained"
-            startIcon={<AddIcon />}
             onClick={() => {
               console.log('➕ Add New Kiosk button clicked!');
               setEditingKiosk(null);
@@ -843,7 +835,9 @@ const AdminPanel: React.FC = () => {
             onClick={() => setOpenUserDialog(false)}
             sx={{ position: 'absolute', right: 8, top: 8 }}
           >
-            <CloseIcon />
+            <Typography sx={{ fontSize: 20, fontWeight: 'bold' }}>
+              ×
+            </Typography>
           </IconButton>
         </DialogTitle>
         <DialogContent dividers>
@@ -887,7 +881,6 @@ const AdminPanel: React.FC = () => {
 
           <Button
             variant="contained"
-            startIcon={<AddIcon />}
             onClick={() => {
               setEditingUser(null);
               setNewUser({ name: '', userCode: '', role: 'applicator', email: '', isActive: true });

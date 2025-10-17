@@ -12,13 +12,7 @@ import {
   Grid,
   Divider
 } from '@mui/material';
-import { 
-  ArrowBack as BackIcon,
-  Calculate as CalculateIcon,
-  LocalShipping as TruckIcon,
-  Logout as LogoutIcon,
-  Computer as KioskIcon
-} from '@mui/icons-material';
+// Using emoji instead of Material-UI icons for better compatibility
 import { useAuth } from '../contexts/AuthContext';
 import { useKiosk } from '../contexts/KioskContext';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -704,7 +698,6 @@ const Calculator: React.FC = () => {
           {mode !== 'fertilizer' && (
             <Button 
               color="inherit" 
-              startIcon={<BackIcon />}
               onClick={() => navigate('/dashboard')}
               sx={{ 
                 mr: 2,
@@ -712,13 +705,12 @@ const Calculator: React.FC = () => {
                 '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' }
               }}
             >
-              Dashboard
+              ← Dashboard
             </Button>
           )}
           <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: mode === 'fertilizer' ? 'center' : 'flex-start' }}>
             {mode === 'fertilizer' && (
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <TruckIcon sx={{ fontSize: 40 }} />
                 <Typography variant="h6" component="div">
                   Fertilizer Calculator
                 </Typography>
@@ -727,7 +719,6 @@ const Calculator: React.FC = () => {
                     size="small"
                     color="inherit"
                     onClick={handleChangeKiosk}
-                    startIcon={<KioskIcon />}
                     sx={{ 
                       color: 'rgba(255,255,255,0.9)',
                       minWidth: 'auto',
@@ -743,7 +734,6 @@ const Calculator: React.FC = () => {
             )}
             {mode !== 'fertilizer' && (
               <>
-                <TruckIcon sx={{ mr: 2 }} />
                 <Typography variant="h6" component="div">
                   {mode === 'application' ? 'Application Calculator' : 'TNT Calculator'}
                 </Typography>
@@ -762,7 +752,6 @@ const Calculator: React.FC = () => {
             <Button 
               color="inherit" 
               onClick={handleLogOut}
-              startIcon={<LogoutIcon />}
               sx={{ 
                 bgcolor: 'rgba(255,255,255,0.1)', 
                 '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } 
@@ -830,8 +819,7 @@ const Calculator: React.FC = () => {
             <Grid item xs={12} md={8}>
               <Card>
                 <CardContent>
-                  <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-                    <CalculateIcon sx={{ mr: 1 }} />
+                  <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold' }}>
                     {mode === 'application' ? 'Application Calculator' : mode === 'tnt' ? 'TNT Calculator' : 'Fertilizer Calculator'}
                   </Typography>
 
@@ -1049,7 +1037,6 @@ const Calculator: React.FC = () => {
                     size="large"
                     onClick={handleCalculate}
                     disabled={!selectedProduct || thousandSqFt <= 0}
-                    startIcon={<CalculateIcon />}
                     sx={{ mt: 2, bgcolor: '#0288d1', '&:hover': { bgcolor: '#0277bd' } }}
                   >
                     Calculate Fertilizer
@@ -1066,7 +1053,6 @@ const Calculator: React.FC = () => {
                       (mode === 'application' && !selectedApplication) ||
                       (mode === 'application' ? frontTank <= 0 : (frontTank <= 0 && backTank <= 0))
                     }
-                    startIcon={<CalculateIcon />}
                     sx={themeColor ? { mt: 2, bgcolor: themeColor, '&:hover': { bgcolor: themeColor === '#c62828' ? '#b71c1c' : themeColor } } : { mt: 2 }}
                   >
                     Calculate TNT Mix

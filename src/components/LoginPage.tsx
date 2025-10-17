@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Box, 
   Paper, 
@@ -18,6 +18,24 @@ const LoginPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+
+  // 60-second timeout to return to splash screen
+  useEffect(() => {
+    console.log('⏱️ Starting 60-second login timeout');
+    const timeout = setTimeout(() => {
+      console.log('⏱️ Login timeout - returning to splash screen');
+      // Clear the session flag to show splash screen again
+      sessionStorage.removeItem('hasSeenSplash');
+      // Reload the page to reset to splash screen
+      window.location.href = '/';
+    }, 60000); // 60 seconds
+
+    // Clear timeout if component unmounts (user logged in)
+    return () => {
+      console.log('⏱️ Clearing login timeout');
+      clearTimeout(timeout);
+    };
+  }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

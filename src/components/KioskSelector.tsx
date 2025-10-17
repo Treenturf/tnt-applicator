@@ -14,10 +14,7 @@ import {
   DialogContent,
   DialogActions
 } from '@mui/material';
-import {
-  Computer as KioskIcon,
-  CheckCircle as SelectedIcon
-} from '@mui/icons-material';
+// Using emoji instead of Material-UI icons for better compatibility
 import { 
   KIOSK_TYPES, 
   DEFAULT_KIOSKS, 
@@ -92,8 +89,7 @@ const KioskSelector: React.FC<KioskSelectorProps> = ({ onKioskSelected }) => {
     <Container maxWidth="lg">
       <Box sx={{ mt: 4, mb: 4 }}>
         <Box sx={{ textAlign: 'center', mb: 4 }}>
-          <KioskIcon sx={{ fontSize: 60, color: 'primary.main', mb: 2 }} />
-          <Typography variant="h3" component="h1" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+          <Typography variant="h3" component="h1" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main', mt: 4 }}>
             TNT Terminals
           </Typography>
           <Typography variant="h6" color="text.secondary">
@@ -136,8 +132,10 @@ const KioskSelector: React.FC<KioskSelectorProps> = ({ onKioskSelected }) => {
                   }} />
                   
                   {isSelected && (
-                    <Box sx={{ position: 'absolute', top: 16, right: 8 }}>
-                      <SelectedIcon sx={{ color: typeInfo.color, fontSize: 30 }} />
+                    <Box sx={{ position: 'absolute', top: 16, right: 16, bgcolor: 'success.main', borderRadius: '50%', width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Typography sx={{ fontSize: 24, fontWeight: 'bold', color: 'white' }}>
+                        ✓
+                      </Typography>
                     </Box>
                   )}
                   
