@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Exit Kiosk</title>
+    <script>
+        // This page will be used to signal kiosk exit
+        // The Raspberry Pi can monitor for this URL and kill Chromium
+        window.onload = function() {
+            document.body.innerHTML = '<h1 style="text-align:center; margin-top:20vh; font-family:Arial;">Exiting Kiosk Mode...</h1>';
+            
+            // Try to close
+            window.close();
+            
+            // If still here after 2 seconds, show instructions
+            setTimeout(function() {
+                document.body.innerHTML += '<p style="text-align:center; font-family:Arial;">Press Alt+F4 to exit</p>';
+            }, 2000);
+        };
+    </script>
+</head>
+<body>
+</body>
+</html>

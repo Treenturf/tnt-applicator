@@ -15,6 +15,7 @@ import {
 import { 
   AdminPanelSettings as AdminIcon,
   ExitToApp as LogoutIcon,
+  ExitToApp,
   Computer as KioskIcon,
   Agriculture as RecipeIcon
 } from '@mui/icons-material';
@@ -101,6 +102,20 @@ const Dashboard: React.FC = () => {
       console.error('❌ Error during logout:', error);
       // Force navigate to login anyway
       navigate('/login', { replace: true });
+    }
+  };
+
+  const handleExitKiosk = async () => {
+    console.log('🚪 Exit Kiosk button clicked');
+    
+    try {
+      // Try to call the local exit endpoint on the Pi
+      await fetch('http://localhost:8888/exit', { method: 'GET', mode: 'no-cors' });
+      console.log('✅ Exit signal sent');
+    } catch (error) {
+      console.error('❌ Error sending exit signal:', error);
+      // Fallback: navigate to exit page
+      window.location.href = '/exit-kiosk.html';
     }
   };
 
@@ -281,6 +296,20 @@ const Dashboard: React.FC = () => {
                 {user?.role?.toLowerCase() === 'admin' ? 'Admin' : 'Applicator'}
               </Typography>
             </Box>
+            {user?.role?.toLowerCase() === 'admin' && (
+              <Button 
+                color="inherit" 
+                onClick={handleExitKiosk}
+                startIcon={<ExitToApp />}
+                sx={{ 
+                  bgcolor: 'rgba(255,255,255,0.1)', 
+                  '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } 
+                }}
+                title="Exit Kiosk Mode"
+              >
+                Exit Kiosk
+              </Button>
+            )}
             <Button 
               color="inherit" 
               onClick={handleLogout}
