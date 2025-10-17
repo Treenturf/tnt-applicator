@@ -5,6 +5,14 @@ const SplashContainer = styled(Box)({
   width: '100vw',
   height: '100vh',
   backgroundColor: '#2d5016', // Tree n Turf green - adjust to your brand color
+  backgroundImage: `
+    linear-gradient(45deg, rgba(0, 0, 0, 0.05) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(0, 0, 0, 0.05) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(0, 0, 0, 0.05) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(0, 0, 0, 0.05) 75%)
+  `,
+  backgroundSize: '40px 40px',
+  backgroundPosition: '0 0, 0 20px, 20px -20px, -20px 0px',
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
@@ -69,38 +77,7 @@ export default function SplashScreen({ onTap }: SplashScreenProps) {
         <LogoImage 
           src="/images/tree-n-turf-logo.png" 
           alt="Tree n Turf Logo"
-          onError={(e) => {
-            // Fallback if logo doesn't exist yet
-            (e.target as HTMLImageElement).style.display = 'none';
-          }}
         />
-        
-        {/* Fallback text if no logo */}
-        <Typography 
-          variant="h1" 
-          sx={{ 
-            color: '#ffffff',
-            fontWeight: 'bold',
-            textAlign: 'center',
-            fontSize: { xs: '2.5rem', sm: '4rem', md: '5rem' },
-            textShadow: '2px 2px 4px rgba(0,0,0,0.3)',
-          }}
-        >
-          Tree n Turf
-        </Typography>
-        
-        <Typography 
-          variant="h4" 
-          sx={{ 
-            color: '#ffffff',
-            fontWeight: 300,
-            textAlign: 'center',
-            fontSize: { xs: '1.2rem', sm: '1.8rem', md: '2rem' },
-            opacity: 0.9,
-          }}
-        >
-          TNT Applicator
-        </Typography>
       </LogoContainer>
       
       <TapText>Tap to continue</TapText>
