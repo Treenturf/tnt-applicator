@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
@@ -8,6 +8,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import DatabaseErrorBoundary from './components/DatabaseErrorBoundary';
 import KioskSelector from './components/KioskSelector';
 import KioskConfigWrapper from './components/KioskConfigWrapper';
+import SplashScreen from './components/SplashScreen';
 import LoginPage from './components/LoginPage.tsx';
 import Dashboard from './components/Dashboard.tsx';
 import AdminPanel from './components/AdminPanel.tsx';
@@ -60,6 +61,35 @@ const ProtectedRoute: React.FC<{
 };
 
 const AppContent: React.FC = () => {
+  const [showSplash, setShowSplash] = useState(true);
+  const { user, loading } = useAuth();
+
+  // Show splash screen on initial load
+  useEffect(() => {
+    // Check if we're coming back from a logout
+    const hasSeenSplash = sessionStorage.getItem('hasSeenSplash');
+    if (hasSeenSplash && user) {
+      setShowSplash(false);
+    }
+  }, [user]);
+
+  // Reset splash screen when user logs out
+  useEffect(() => {
+    if (!user && !loading) {
+      setShowSplash(true);
+      sessionStorage.removeItem('hasSeenSplash');
+    }
+  }, [user, loading]);
+
+  const handleSplashTap = () => {
+    setShowSplash(false);
+    sessionStorage.setItem('hasSeenSplash', 'true');
+  };
+
+  if (showSplash && !user) {
+    return <SplashScreen onTap={handleSplashTap} />;
+  }
+
   return (
     <Router>
       <Routes>
