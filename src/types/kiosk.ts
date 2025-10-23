@@ -7,6 +7,7 @@ export interface KioskConfig {
   type: 'specialty' | 'fertilizer' | 'mixed';
   description: string;
   availableProducts: string[]; // Product IDs
+  availableApplications: string[]; // Application/Recipe IDs available for this kiosk
   defaultApplicationId?: string; // Default recipe/application ID for this kiosk
   defaultTruckTypes: ('hose' | 'cart' | 'trailer' | 'backpack')[];
   calculationMode: 'liquid' | 'granular' | 'both';
@@ -34,7 +35,7 @@ export interface KioskProduct {
 
 export const KIOSK_TYPES = {
   specialty: {
-    name: 'Standard Applications',
+    name: 'Main Terminal',
     description: 'Liquid chemicals, herbicides, insecticides',
     icon: '🧪',
     color: '#4caf50',
@@ -62,10 +63,11 @@ export const KIOSK_TYPES = {
 export const DEFAULT_KIOSKS: KioskConfig[] = [
   {
     id: 'main-terminal',
-    name: 'Standard Applications',
+    name: 'Main Terminal',
     type: 'specialty',
     description: 'Liquid chemicals and herbicides only',
     availableProducts: [], // Will be filtered to specialty products
+    availableApplications: [], // Will be populated with applications for specialty kiosks
     defaultTruckTypes: ['hose', 'cart'],
     calculationMode: 'liquid',
     units: { primary: 'gallons' }
@@ -76,6 +78,7 @@ export const DEFAULT_KIOSKS: KioskConfig[] = [
     type: 'mixed',
     description: 'Primary loading station with all products',
     availableProducts: [], // Will be populated with all products
+    availableApplications: [], // Will be populated with applications for mixed kiosks
     defaultTruckTypes: ['trailer', 'backpack'],
     calculationMode: 'both',
     units: { primary: 'gallons', secondary: 'pounds' }
@@ -86,6 +89,7 @@ export const DEFAULT_KIOSKS: KioskConfig[] = [
     type: 'fertilizer',
     description: 'Granular fertilizer products only',
     availableProducts: [], // Will be filtered to fertilizer products
+    availableApplications: [], // Will be populated with applications for fertilizer kiosks
     defaultTruckTypes: ['cart'],
     calculationMode: 'granular',
     units: { primary: 'bags', secondary: 'pounds' }

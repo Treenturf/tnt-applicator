@@ -89,7 +89,7 @@ const AdminPanel: React.FC = () => {
     description: string;
     availableProducts: string[];
     availableApplications?: string[];
-    defaultApplicationId?: string; // For Standard Applications kiosks - which recipe is default
+    defaultApplicationId?: string; // For Main Terminal kiosks - which recipe is default
     defaultTruckTypes: string[];
     calculationMode: string;
     units: { primary: string };
@@ -817,8 +817,8 @@ const AdminPanel: React.FC = () => {
                       p: 1
                     }}
                   >
-                    {(newKiosk.type === 'specialty' || newKiosk.type === 'mixed') ? (
-                      // Show default recipe selection for Standard Applications kiosk
+                    {newKiosk.type === 'specialty' ? (
+                      // Main Terminal: Single default recipe selection
                       (() => {
                         // Filter applications that are available for this kiosk type
                         const availableForKiosk = filteredApplications; // Already filtered by newKiosk.type
@@ -897,8 +897,77 @@ const AdminPanel: React.FC = () => {
                           </>
                         );
                       })()
+                    ) : newKiosk.type === 'mixed' ? (
+                      // Specialty Kiosk: Multiple recipe selection (checkboxes)
+                      (() => {
+                        const availableForKiosk = filteredApplications; // Already filtered by newKiosk.type
+                        
+                        return availableForKiosk.length === 0 ? (
+                          <Box sx={{ p: 2, textAlign: 'center' }}>
+                            <Typography color="text.secondary" gutterBottom>
+                              No recipes are configured for this kiosk type.
+                            </Typography>
+                            <Typography variant="caption" color="info.main">
+                              Go to Application Recipes and set recipes as available for this kiosk type first.
+                            </Typography>
+                          </Box>
+                        ) : (
+                          <>
+                            <Typography variant="caption" color="info.main" sx={{ mb: 2, display: 'block', fontWeight: 'bold' }}>
+                              ✅ Select multiple recipes to be available on this kiosk. Users can choose from these options.
+                            </Typography>
+                            {availableForKiosk.map((application) => {
+                              const isEnabled = newKiosk.availableApplications?.includes(application.id) || false;
+                              return (
+                                <Box 
+                                  key={application.id} 
+                                  sx={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    py: 1,
+                                    px: 2,
+                                    border: '1px solid',
+                                    borderColor: 'grey.300',
+                                    borderRadius: 1,
+                                    mb: 1,
+                                    bgcolor: 'background.paper'
+                                  }}
+                                >
+                                  <Checkbox
+                                    checked={isEnabled}
+                                    onChange={(e) => {
+                                      const checked = e.target.checked;
+                                      console.log('📝 Checkbox clicked for application:', application.name, 'New state:', checked);
+                                      setNewKiosk(prevKiosk => {
+                                        const currentApplications = prevKiosk.availableApplications || [];
+                                        const updatedApplications = checked
+                                          ? [...currentApplications, application.id]
+                                          : currentApplications.filter(id => id !== application.id);
+                                        
+                                        return {
+                                          ...prevKiosk,
+                                          availableApplications: updatedApplications
+                                        };
+                                      });
+                                    }}
+                                    color="primary"
+                                  />
+                                  <Box sx={{ flexGrow: 1, ml: 1 }}>
+                                    <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                                      {application.name}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                      {application.description || 'No description'}
+                                    </Typography>
+                                  </Box>
+                                </Box>
+                              );
+                            })}
+                          </>
+                        );
+                      })()
                     ) : (
-                      // Show products for other kiosk types
+                      // Show products for fertilizer and other kiosk types
                     products.length === 0 ? (
                       <Typography color="text.secondary">No products available. Please add products first.</Typography>
                     ) : (
