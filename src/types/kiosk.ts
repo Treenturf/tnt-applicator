@@ -7,6 +7,7 @@ export interface KioskConfig {
   type: 'specialty' | 'fertilizer' | 'mixed';
   description: string;
   availableProducts: string[]; // Product IDs
+  defaultApplicationId?: string; // Default recipe/application ID for this kiosk
   defaultTruckTypes: ('hose' | 'cart' | 'trailer' | 'backpack')[];
   calculationMode: 'liquid' | 'granular' | 'both';
   units: {

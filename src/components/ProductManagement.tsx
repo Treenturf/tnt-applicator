@@ -54,7 +54,7 @@ import { getKioskProducts } from '../types/kiosk';
 interface Product {
   id: string;
   name: string;
-  type: 'fertilizer' | 'herbicide' | 'insecticide' | 'pre-emergent' | 'spreader-sticker' | 'other';
+  type: 'fertilizer' | 'herbicide' | 'insecticide' | 'fungicide' | 'pre-emergent' | 'spreader-sticker' | 'other';
   // Liquid product properties
   hoseRatePerGallon: number; // Amount per gallon for hose truck
   cartRatePerGallon: number; // Amount per gallon for cart truck
@@ -283,6 +283,7 @@ const ProductManagement: React.FC = () => {
       case 'fertilizer': return 'success';
       case 'herbicide': return 'warning';
       case 'insecticide': return 'error';
+      case 'fungicide': return 'secondary';
       case 'pre-emergent': return 'info';
       case 'spreader-sticker': return 'secondary';
       default: return 'default';
@@ -389,6 +390,16 @@ const ProductManagement: React.FC = () => {
           <Grid item xs={6} sm={4} md={2}>
             <Card>
               <CardContent sx={{ textAlign: 'center', py: 2 }}>
+                <Typography variant="h4" color="text.secondary" sx={{ fontWeight: 'bold', color: '#6a4c93' }}>
+                  {products.filter(p => (p.type === 'fungicide' || (p as any).category === 'fungicide') && p.isActive).length}
+                </Typography>
+                <Typography variant="caption">Fungicides</Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={6} sm={4} md={2}>
+            <Card>
+              <CardContent sx={{ textAlign: 'center', py: 2 }}>
                 <Typography variant="h4" color="info.main">
                   {products.filter(p => (p.type === 'pre-emergent' || (p as any).category === 'pre-emergent') && p.isActive).length}
                 </Typography>
@@ -399,7 +410,7 @@ const ProductManagement: React.FC = () => {
           <Grid item xs={6} sm={4} md={2}>
             <Card>
               <CardContent sx={{ textAlign: 'center', py: 2 }}>
-                <Typography variant="h4" color="secondary.main">
+                <Typography variant="h4" sx={{ color: '#9c27b0' }}>
                   {products.filter(p => (p.type === 'spreader-sticker' || (p as any).category === 'spreader-sticker') && p.isActive).length}
                 </Typography>
                 <Typography variant="caption">Spreader Sticker</Typography>
@@ -454,6 +465,18 @@ const ProductManagement: React.FC = () => {
                           label={product.type} 
                           color={getTypeColor(product.type) as any}
                           size="small"
+                          sx={{
+                            ...(product.type === 'fungicide' && {
+                              backgroundColor: '#6a4c93',
+                              color: 'white',
+                              '& .MuiChip-label': { fontWeight: 'bold' }
+                            }),
+                            ...(product.type === 'spreader-sticker' && {
+                              backgroundColor: '#9c27b0',
+                              color: 'white', 
+                              '& .MuiChip-label': { fontWeight: 'bold' }
+                            })
+                          }}
                         />
                       </TableCell>
                       <TableCell>
@@ -562,6 +585,7 @@ const ProductManagement: React.FC = () => {
                 <MenuItem value="fertilizer">Fertilizer</MenuItem>
                 <MenuItem value="herbicide">Herbicide</MenuItem>
                 <MenuItem value="insecticide">Insecticide</MenuItem>
+                <MenuItem value="fungicide">Fungicide</MenuItem>
                 <MenuItem value="pre-emergent">Pre-emergent</MenuItem>
                 <MenuItem value="spreader-sticker">Spreader Sticker</MenuItem>
                 <MenuItem value="other">Other</MenuItem>

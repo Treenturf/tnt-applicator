@@ -54,7 +54,7 @@ interface Application {
   id: string;
   name: string;
   description?: string;
-  category: 'fertilizer' | 'herbicide' | 'insecticide' | 'pre-emergent' | 'spreader-sticker' | 'mixed';
+  category: 'fertilizer' | 'herbicide' | 'insecticide' | 'fungicide' | 'pre-emergent' | 'spreader-sticker' | 'mixed';
   applicationCategory?: 'trees' | 'other';
   products: ApplicationProduct[];
   isActive: boolean;
@@ -165,9 +165,10 @@ const ApplicationManagementReadOnly: React.FC = () => {
       case 'fertilizer': return 'success';
       case 'herbicide': return 'warning';
       case 'insecticide': return 'error';
+      case 'fungicide': return 'secondary';
       case 'pre-emergent': return 'info';
-      case 'spreader-sticker': return 'secondary';
-      case 'mixed': return 'primary';
+      case 'spreader-sticker': return 'primary';
+      case 'mixed': return 'default';
       default: return 'default';
     }
   };

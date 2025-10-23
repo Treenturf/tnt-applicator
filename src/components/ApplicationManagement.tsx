@@ -83,7 +83,7 @@ interface Application {
   id: string;
   name: string;
   description?: string;
-  category: 'fertilizer' | 'herbicide' | 'insecticide' | 'pre-emergent' | 'spreader-sticker' | 'mixed';
+  category: 'fertilizer' | 'herbicide' | 'insecticide' | 'fungicide' | 'pre-emergent' | 'spreader-sticker' | 'mixed';
   applicationCategory?: 'trees' | 'other'; // New field for Trees vs Other categorization
   products: ApplicationProduct[];
   isActive: boolean;
@@ -96,7 +96,7 @@ interface Application {
 interface Product {
   id: string;
   name: string;
-  type: 'fertilizer' | 'herbicide' | 'insecticide' | 'pre-emergent' | 'spreader-sticker' | 'other';
+  type: 'fertilizer' | 'herbicide' | 'insecticide' | 'fungicide' | 'pre-emergent' | 'spreader-sticker' | 'other';
   hoseRatePerGallon: number;
   cartRatePerGallon: number;
   backpackRatePerGallon?: number;
@@ -727,9 +727,10 @@ const ApplicationManagement: React.FC = () => {
       case 'fertilizer': return 'success';
       case 'herbicide': return 'warning';
       case 'insecticide': return 'error';
+      case 'fungicide': return 'secondary';
       case 'pre-emergent': return 'info';
-      case 'spreader-sticker': return 'secondary';
-      case 'mixed': return 'primary';
+      case 'spreader-sticker': return 'primary';
+      case 'mixed': return 'default';
       default: return 'default';
     }
   };
@@ -1094,6 +1095,7 @@ const ApplicationManagement: React.FC = () => {
                     <MenuItem value="fertilizer">Fertilizer</MenuItem>
                     <MenuItem value="herbicide">Herbicide</MenuItem>
                     <MenuItem value="insecticide">Insecticide</MenuItem>
+                    <MenuItem value="fungicide">Fungicide</MenuItem>
                     <MenuItem value="pre-emergent">Pre-emergent</MenuItem>
                     <MenuItem value="spreader-sticker">Spreader Sticker</MenuItem>
                     <MenuItem value="mixed">Mixed Application</MenuItem>

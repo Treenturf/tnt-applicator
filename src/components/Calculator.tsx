@@ -28,7 +28,7 @@ import {
 interface Product {
   id: string;
   name: string;
-  type: 'fertilizer' | 'herbicide' | 'insecticide' | 'pre-emergent' | 'spreader-sticker' | 'other';
+  type: 'fertilizer' | 'herbicide' | 'insecticide' | 'fungicide' | 'pre-emergent' | 'spreader-sticker' | 'other';
   // Liquid product properties (ounces per gallon)
   hoseRatePerGallon: number;
   cartRatePerGallon: number;
@@ -183,13 +183,30 @@ const Calculator: React.FC = () => {
         ...doc.data()
       })) as any[];
       
-      // Find the default application
-      const defaultApp = applicationsData.find(app => app.isDefault && app.isActive);
+      // First, try to use the kiosk-specific default application
+      if (currentKiosk?.defaultApplicationId) {
+        console.log('🎯 Looking for kiosk-specific default application:', currentKiosk.defaultApplicationId);
+        const kioskDefaultApp = applicationsData.find(app => 
+          app.id === currentKiosk.defaultApplicationId && app.isActive
+        );
+        
+        if (kioskDefaultApp) {
+          console.log('✅ Found kiosk-specific default application:', kioskDefaultApp.name);
+          setDefaultApplication(kioskDefaultApp);
+          return;
+        } else {
+          console.warn('⚠️ Kiosk default application not found or inactive:', currentKiosk.defaultApplicationId);
+        }
+      }
       
-      if (defaultApp) {
-        setDefaultApplication(defaultApp);
+      // Fallback: Find the global default application (for backward compatibility)
+      const globalDefaultApp = applicationsData.find(app => app.isDefault && app.isActive);
+      
+      if (globalDefaultApp) {
+        console.log('🔄 Using global default application:', globalDefaultApp.name);
+        setDefaultApplication(globalDefaultApp);
       } else {
-        console.warn('No default application recipe found. Admin needs to set one.');
+        console.warn('❌ No default application recipe found. Admin needs to set one.');
       }
     } catch (error) {
       console.error('Error loading default application:', error);

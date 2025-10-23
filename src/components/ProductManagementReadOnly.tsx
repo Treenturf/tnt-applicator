@@ -33,7 +33,7 @@ import { collection, getDocs } from 'firebase/firestore';
 interface Product {
   id: string;
   name: string;
-  type: 'fertilizer' | 'herbicide' | 'insecticide' | 'pre-emergent' | 'spreader-sticker' | 'other';
+  type: 'fertilizer' | 'herbicide' | 'insecticide' | 'fungicide' | 'pre-emergent' | 'spreader-sticker' | 'other';
   hoseRatePerGallon: number;
   cartRatePerGallon: number;
   backpackRatePerGallon?: number;
@@ -80,8 +80,9 @@ const ProductManagementReadOnly: React.FC = () => {
       case 'fertilizer': return 'success';
       case 'herbicide': return 'warning';
       case 'insecticide': return 'error';
+      case 'fungicide': return 'secondary';
       case 'pre-emergent': return 'info';
-      case 'spreader-sticker': return 'secondary';
+      case 'spreader-sticker': return 'primary';
       default: return 'default';
     }
   };
@@ -164,6 +165,7 @@ const ProductManagementReadOnly: React.FC = () => {
                 <MenuItem value="fertilizer">Fertilizer</MenuItem>
                 <MenuItem value="herbicide">Herbicide</MenuItem>
                 <MenuItem value="insecticide">Insecticide</MenuItem>
+                <MenuItem value="fungicide">Fungicide</MenuItem>
                 <MenuItem value="pre-emergent">Pre-emergent</MenuItem>
                 <MenuItem value="spreader-sticker">Spreader Sticker</MenuItem>
                 <MenuItem value="other">Other</MenuItem>
@@ -211,6 +213,16 @@ const ProductManagementReadOnly: React.FC = () => {
                   {products.filter(p => p.type === 'insecticide' && p.isActive).length}
                 </Typography>
                 <Typography variant="caption">Insecticides</Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={6} sm={3}>
+            <Card>
+              <CardContent sx={{ textAlign: 'center', py: 2 }}>
+                <Typography variant="h4" color="secondary.main">
+                  {products.filter(p => p.type === 'fungicide' && p.isActive).length}
+                </Typography>
+                <Typography variant="caption">Fungicides</Typography>
               </CardContent>
             </Card>
           </Grid>

@@ -26,7 +26,7 @@ import {
   Select,
   MenuItem,
   IconButton,
-  FormControlLabel,
+
   Checkbox
 } from '@mui/material';
 // Using emoji instead of Material-UI icons for better compatibility
@@ -38,7 +38,7 @@ import { db } from '../firebase';
 
 const AdminPanel: React.FC = () => {
   const { user, logout } = useAuth();
-  const { currentKiosk } = useKiosk();
+  const { currentKiosk, refreshKioskConfig } = useKiosk();
   const navigate = useNavigate();
 
   // State management
@@ -49,11 +49,7 @@ const AdminPanel: React.FC = () => {
   const [message, setMessage] = useState('');
   
   // Log messages to console instead of showing UI notifications
-  React.useEffect(() => {
-    if (message) {
-      console.log('📢 AdminPanel:', message);
-    }
-  }, [message]);
+
   
   const [loading, setLoading] = useState(false);
   
@@ -66,6 +62,7 @@ const AdminPanel: React.FC = () => {
   
   // Refs for scrolling
   const editFormRef = useRef<HTMLDivElement>(null);
+  const kioskFormRef = useRef<HTMLDivElement>(null);
   
   // Form states
   const [newUser, setNewUser] = useState({
@@ -92,6 +89,7 @@ const AdminPanel: React.FC = () => {
     description: string;
     availableProducts: string[];
     availableApplications?: string[];
+    defaultApplicationId?: string; // For Standard Applications kiosks - which recipe is default
     defaultTruckTypes: string[];
     calculationMode: string;
     units: { primary: string };
@@ -102,6 +100,7 @@ const AdminPanel: React.FC = () => {
     description: '',
     availableProducts: [],
     availableApplications: [],
+    defaultApplicationId: undefined,
     defaultTruckTypes: [],
     calculationMode: 'both',
     units: { primary: 'gallons' },
@@ -226,6 +225,12 @@ const AdminPanel: React.FC = () => {
       const activeApplications = applicationsData.filter((a: any) => a.isActive);
       setApplications(activeApplications);
       console.log('💾 AdminPanel: Loaded', activeApplications.length, 'active applications');
+      console.log('📋 AdminPanel: Applications with availableKiosks:', 
+        activeApplications.map((app: any) => ({
+          name: app.name,
+          availableKiosks: app.availableKiosks
+        }))
+      );
     } catch (error) {
       console.error('❌ AdminPanel: Error loading applications:', error);
       setMessage('Error loading applications');
@@ -354,10 +359,11 @@ const AdminPanel: React.FC = () => {
         
         console.log('✏️ UPDATING kiosk:', kioskToSave.id);
         console.log('📦 Final products to save:', kioskToSave.availableProducts);
+        console.log('⭐ Default application ID to save:', kioskToSave.defaultApplicationId);
         
         // Save to Firestore using the kiosk ID as document ID
         await setDoc(doc(db, 'kiosks', editingKiosk.id), kioskToSave, { merge: true });
-        setMessage(`Kiosk "${kioskToSave.name}" updated successfully! Products assigned: ${kioskToSave.availableProducts.length}`);
+        setMessage(`Kiosk "${kioskToSave.name}" updated successfully! Default recipe saved.`);
         
         console.log('✅ Updated kiosk in Firestore:', kioskToSave);
         console.log('📦 Selected products:', kioskToSave.availableProducts);
@@ -375,6 +381,11 @@ const AdminPanel: React.FC = () => {
         await addDoc(collection(db, 'kiosks'), kioskToSave);
         setMessage(`Kiosk "${kioskToSave.name}" created successfully! Products assigned: ${kioskToSave.availableProducts.length}`);
       }
+
+      // Refresh the kiosk context so Calculator gets updated configuration
+      console.log('🔄 Refreshing kiosk context after save...');
+      await refreshKioskConfig();
+      console.log('✅ Kiosk context refreshed');
 
       setOpenKioskDialog(false);
       setEditingKiosk(null);
@@ -461,12 +472,21 @@ const AdminPanel: React.FC = () => {
       description: kiosk.description || '',
       availableProducts: kiosk.availableProducts || [],
       availableApplications: kiosk.availableApplications || [],
+      defaultApplicationId: kiosk.defaultApplicationId || undefined,
       defaultTruckTypes: kiosk.defaultTruckTypes || [],
       calculationMode: kiosk.calculationMode || 'both',
       units: kiosk.units || { primary: 'gallons' },
       location: kiosk.location || ''
     });
     setOpenKioskDialog(true);
+    
+    // Scroll to kiosk form after a short delay to ensure dialog has opened
+    setTimeout(() => {
+      kioskFormRef.current?.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'start' 
+      });
+    }, 100);
   };
 
   const handleProductToggle = (productId: string, checked: boolean) => {
@@ -497,33 +517,7 @@ const AdminPanel: React.FC = () => {
     console.log('💾 State updated with', updated.length, 'products');
   };
 
-  const handleApplicationToggle = (applicationId: string, checked: boolean) => {
-    console.log('🔄 Toggle application:', applicationId, 'checked:', checked);
-    console.log('📋 Current availableApplications:', newKiosk.availableApplications);
-    
-    const currentApplications = newKiosk.availableApplications || [];
-    let updated: string[];
-    
-    if (checked) {
-      // Add application if not already in list
-      updated = currentApplications.includes(applicationId) 
-        ? currentApplications 
-        : [...currentApplications, applicationId];
-      console.log('✅ Adding application. New list:', updated);
-    } else {
-      // Remove application
-      updated = currentApplications.filter(id => id !== applicationId);
-      console.log('❌ Removing application. New list:', updated);
-    }
-    
-    // Update the state with a completely new object
-    setNewKiosk(prev => ({
-      ...prev,
-      availableApplications: updated
-    }));
-    
-    console.log('💾 State updated with', updated.length, 'applications');
-  };
+
 
   // Memoize filtered products to prevent re-renders
   const filteredProducts = useMemo(() => {
@@ -551,9 +545,13 @@ const AdminPanel: React.FC = () => {
 
   // Memoize filtered applications to prevent re-renders
   const filteredApplications = useMemo(() => {
-    return applications.filter(app => 
+    const filtered = applications.filter(app => 
       app.availableKiosks?.includes(newKiosk.type) || false
     );
+    console.log('🔍 Filtering applications for kiosk type:', newKiosk.type);
+    console.log('📋 Total applications:', applications.length);
+    console.log('✅ Filtered applications:', filtered.length, filtered.map(app => app.name));
+    return filtered;
   }, [applications, newKiosk.type]);
 
   // Log when availableProducts changes
@@ -563,6 +561,14 @@ const AdminPanel: React.FC = () => {
       console.log('📝 Form state - isAddingKiosk:', isAddingKiosk, 'editingKiosk:', editingKiosk?.name || 'none');
     }
   }, [newKiosk.availableProducts, isAddingKiosk, editingKiosk]);
+
+  // Log when defaultApplicationId changes
+  useEffect(() => {
+    if (isAddingKiosk || editingKiosk) {
+      console.log('⭐ newKiosk.defaultApplicationId changed:', newKiosk.defaultApplicationId);
+      console.log('📝 Full newKiosk state:', newKiosk);
+    }
+  }, [newKiosk.defaultApplicationId, isAddingKiosk, editingKiosk, newKiosk]);
 
   const handleLogout = async () => {
     try {
@@ -721,6 +727,7 @@ const AdminPanel: React.FC = () => {
                 description: '',
                 availableProducts: [],
                 availableApplications: [],
+                defaultApplicationId: undefined,
                 defaultTruckTypes: [],
                 calculationMode: 'both',
                 units: { primary: 'gallons' },
@@ -735,7 +742,7 @@ const AdminPanel: React.FC = () => {
 
           {/* Kiosk Form */}
           {(editingKiosk || isAddingKiosk) && (
-            <Box sx={{ border: '1px solid', borderColor: 'grey.300', borderRadius: 1, p: 2 }}>
+            <Box ref={kioskFormRef} sx={{ border: '1px solid', borderColor: 'grey.300', borderRadius: 1, p: 2 }}>
               <Typography variant="h6" gutterBottom>
                 {editingKiosk ? 'Edit Kiosk' : 'Add New Kiosk'}
               </Typography>
@@ -792,11 +799,11 @@ const AdminPanel: React.FC = () => {
                 
                 <Grid item xs={12}>
                   <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
-                    {newKiosk.type === 'mixed' ? 'Available Recipes' : 'Available Products'}
+                    {(newKiosk.type === 'specialty' || newKiosk.type === 'mixed') ? 'Default Recipe Selection' : 'Available Products'}
                   </Typography>
                   <Typography variant="body2" color="text.secondary" gutterBottom>
-                    {newKiosk.type === 'mixed' 
-                      ? 'Select which application recipes should be available on this kiosk:' 
+                    {(newKiosk.type === 'specialty' || newKiosk.type === 'mixed')
+                      ? 'Choose the default recipe for this kiosk. (Available recipes are managed in Application Recipes section)' 
                       : 'Select which products should be available on this kiosk:'}
                   </Typography>
                   
@@ -810,51 +817,86 @@ const AdminPanel: React.FC = () => {
                       p: 1
                     }}
                   >
-                    {newKiosk.type === 'mixed' ? (
-                      // Show applications for mixed/specialty kiosk
-                      filteredApplications.length === 0 ? (
-                        <Typography color="text.secondary">No applications available for this kiosk type.</Typography>
-                      ) : (
-                        filteredApplications.map((application) => (
-                          <Box 
-                            key={application.id} 
-                            sx={{ 
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              py: 0.5,
-                              px: 1,
-                              cursor: 'pointer',
-                              '&:hover': { bgcolor: 'action.hover' },
-                              borderRadius: 1
-                            }}
-                          >
-                            <Checkbox
-                              id={`kiosk-application-${application.id}`}
-                              checked={newKiosk.availableApplications?.includes(application.id) || false}
-                              onChange={(e) => {
-                                console.log('📌 Application checkbox changed!', application.name, application.id, 'New state:', e.target.checked);
-                                handleApplicationToggle(application.id, e.target.checked);
-                              }}
-                            />
-                            <Box 
-                              sx={{ ml: 1, flexGrow: 1, cursor: 'pointer' }}
-                              onClick={() => {
-                                const isCurrentlyChecked = newKiosk.availableApplications?.includes(application.id) || false;
-                                const newCheckedState = !isCurrentlyChecked;
-                                console.log('📌 Application label clicked!', application.name, 'Toggle to:', newCheckedState);
-                                handleApplicationToggle(application.id, newCheckedState);
-                              }}
-                            >
-                              <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-                                {application.name}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                {application.description || 'No description'}
-                              </Typography>
-                            </Box>
+                    {(newKiosk.type === 'specialty' || newKiosk.type === 'mixed') ? (
+                      // Show default recipe selection for Standard Applications kiosk
+                      (() => {
+                        // Filter applications that are available for this kiosk type
+                        const availableForKiosk = filteredApplications; // Already filtered by newKiosk.type
+                        
+                        return availableForKiosk.length === 0 ? (
+                          <Box sx={{ p: 2, textAlign: 'center' }}>
+                            <Typography color="text.secondary" gutterBottom>
+                              No recipes are configured for this kiosk type.
+                            </Typography>
+                            <Typography variant="caption" color="info.main">
+                              Go to Application Recipes and set recipes as available for this kiosk type first.
+                            </Typography>
                           </Box>
-                        ))
-                      )
+                        ) : (
+                          <>
+                            <Typography variant="caption" color="info.main" sx={{ mb: 2, display: 'block', fontWeight: 'bold' }}>
+                              ⭐ Select ONE recipe as the default for this kiosk. Users will see this recipe first.
+                            </Typography>
+                            {availableForKiosk.map((application) => {
+                              const isSelected = newKiosk.defaultApplicationId === application.id;
+                              return (
+                                <Box 
+                                  key={application.id} 
+                                  sx={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'space-between',
+                                    py: 1,
+                                    px: 2,
+                                    border: '2px solid',
+                                    borderColor: isSelected ? 'warning.main' : 'grey.300',
+                                    borderRadius: 1,
+                                    mb: 1,
+                                    bgcolor: isSelected ? 'warning.light' : 'background.paper'
+                                  }}
+                                >
+                                  <Box sx={{ flexGrow: 1 }}>
+                                    <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                                      {application.name}
+                                      {isSelected && (
+                                        <Chip 
+                                          label="Default" 
+                                          color="warning" 
+                                          size="small" 
+                                          sx={{ ml: 1 }} 
+                                        />
+                                      )}
+                                    </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  {application.description || 'No description'}
+                                </Typography>
+                              </Box>
+                              <Button
+                                    variant={isSelected ? "contained" : "outlined"}
+                                    color={isSelected ? "warning" : "primary"}
+                                size="small"
+                                onClick={() => {
+                                  console.log('� Button clicked for application:', application.name, 'selected as default');
+                                      setNewKiosk(prevKiosk => {
+                                        const updatedKiosk = {
+                                          ...prevKiosk,
+                                          defaultApplicationId: application.id
+                                        };
+                                        console.log('📝 State update - Previous defaultApplicationId:', prevKiosk.defaultApplicationId);
+                                        console.log('📝 State update - New defaultApplicationId:', updatedKiosk.defaultApplicationId);
+                                        return updatedKiosk;
+                                      });
+                                }}
+                                    sx={{ minWidth: 100 }}
+                                  >
+                                    {isSelected ? '⭐ Default' : 'Set Default'}
+                                  </Button>
+                                </Box>
+                              );
+                            })}
+                          </>
+                        );
+                      })()
                     ) : (
                       // Show products for other kiosk types
                     products.length === 0 ? (
@@ -869,45 +911,47 @@ const AdminPanel: React.FC = () => {
                             No products match this kiosk type. Add products first.
                           </Typography>
                         ) : (
-                          filteredProducts.map((product) => (
-                            <Box 
-                              key={product.id} 
-                              sx={{ 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                py: 0.5,
-                                px: 1,
-                                cursor: 'pointer',
-                                '&:hover': { bgcolor: 'action.hover' },
-                                borderRadius: 1
-                              }}
-                            >
-                              <Checkbox
-                                id={`kiosk-product-${product.id}`}
-                                checked={newKiosk.availableProducts?.includes(product.id) || false}
-                                onChange={(e) => {
-                                  console.log('📌 Checkbox changed!', product.name, product.id, 'New state:', e.target.checked);
-                                  handleProductToggle(product.id, e.target.checked);
-                                }}
-                              />
+                          filteredProducts.map((product) => {
+                            const isEnabled = newKiosk.availableProducts?.includes(product.id) || false;
+                            return (
                               <Box 
-                                sx={{ ml: 1, flexGrow: 1, cursor: 'pointer' }}
-                                onClick={() => {
-                                  const isCurrentlyChecked = newKiosk.availableProducts?.includes(product.id) || false;
-                                  const newCheckedState = !isCurrentlyChecked;
-                                  console.log('📌 Label clicked!', product.name, 'Toggle to:', newCheckedState);
-                                  handleProductToggle(product.id, newCheckedState);
+                                key={product.id} 
+                                sx={{ 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  justifyContent: 'space-between',
+                                  py: 1,
+                                  px: 2,
+                                  border: '1px solid',
+                                  borderColor: isEnabled ? 'success.main' : 'grey.300',
+                                  borderRadius: 1,
+                                  mb: 1,
+                                  bgcolor: isEnabled ? 'success.light' : 'background.paper'
                                 }}
                               >
-                                <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-                                  {product.name}
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                  Type: {product.type}
-                                </Typography>
+                                <Box sx={{ flexGrow: 1 }}>
+                                  <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                                    {product.name}
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary">
+                                    Type: {product.type}
+                                  </Typography>
+                                </Box>
+                                <Button
+                                  variant={isEnabled ? "contained" : "outlined"}
+                                  color={isEnabled ? "success" : "primary"}
+                                  size="small"
+                                  onClick={() => {
+                                    console.log('� Button clicked for product:', product.name, 'Current state:', isEnabled, 'New state:', !isEnabled);
+                                    handleProductToggle(product.id, !isEnabled);
+                                  }}
+                                  sx={{ minWidth: 80 }}
+                                >
+                                  {isEnabled ? '✓ Enabled' : 'Enable'}
+                                </Button>
                               </Box>
-                            </Box>
-                          ))
+                            );
+                          })
                         )}
                       </>
                     )
