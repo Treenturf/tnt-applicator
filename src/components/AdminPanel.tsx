@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Container,
   Typography,
@@ -25,8 +25,6 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Alert,
-  Snackbar,
   IconButton,
   FormControlLabel,
   Checkbox
@@ -35,7 +33,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { useKiosk } from '../contexts/KioskContext';
 import { useNavigate } from 'react-router-dom';
-import { collection, getDocs, addDoc, updateDoc, setDoc, doc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, updateDoc, setDoc, doc, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 
 const AdminPanel: React.FC = () => {
@@ -49,6 +47,14 @@ const AdminPanel: React.FC = () => {
   const [kiosks, setKiosks] = useState<any[]>([]);
   const [applications, setApplications] = useState<any[]>([]);
   const [message, setMessage] = useState('');
+  
+  // Log messages to console instead of showing UI notifications
+  React.useEffect(() => {
+    if (message) {
+      console.log('📢 AdminPanel:', message);
+    }
+  }, [message]);
+  
   const [loading, setLoading] = useState(false);
   
   // Dialog states
@@ -58,14 +64,27 @@ const AdminPanel: React.FC = () => {
   const [editingKiosk, setEditingKiosk] = useState<any>(null);
   const [isAddingKiosk, setIsAddingKiosk] = useState(false);
   
+  // Refs for scrolling
+  const editFormRef = useRef<HTMLDivElement>(null);
+  
   // Form states
   const [newUser, setNewUser] = useState({
     name: '',
     userCode: '',
     role: 'applicator',
     email: '',
-    isActive: true
+    isActive: true,
+    canAccessReports: false
   });
+  
+  // Debug: Monitor newUser state changes
+  React.useEffect(() => {
+    console.log('👤 newUser state changed:', newUser);
+    console.log('👤 Checkbox should be checked:', Boolean(newUser.canAccessReports));
+    if (newUser.role === 'manager') {
+      console.log('🔍 Manager role detected - canAccessReports:', newUser.canAccessReports);
+    }
+  }, [newUser]);
   
   const [newKiosk, setNewKiosk] = useState<{
     name: string;
@@ -151,11 +170,21 @@ const AdminPanel: React.FC = () => {
   const loadUsers = async () => {
     try {
       const usersSnapshot = await getDocs(collection(db, 'users'));
-      const usersData = usersSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      const usersData = usersSnapshot.docs.map(doc => {
+        const userData = doc.data();
+        // Ensure canAccessReports field exists for manager users
+        if (userData.role === 'manager' && userData.canAccessReports === undefined) {
+          console.log('🔄 Migrating manager user - adding canAccessReports field:', userData.name);
+        }
+        return {
+          id: doc.id,
+          ...userData,
+          // Set default value for canAccessReports if it doesn't exist
+          canAccessReports: userData.canAccessReports ?? false
+        };
+      });
       setUsers(usersData);
+      console.log('👥 Loaded users:', usersData);
     } catch (error) {
       console.error('Error loading users:', error);
       setMessage('Error loading users');
@@ -254,8 +283,16 @@ const AdminPanel: React.FC = () => {
   };
 
   const handleSaveUser = async () => {
+    // Prevent double-clicking and multiple submissions
+    if (loading) {
+      console.log('🛑 Already saving user, ignoring duplicate request');
+      return;
+    }
+
     try {
       setLoading(true);
+      console.log('💾 Starting user save process...');
+      
       const userToSave = {
         ...newUser,
         userCode: newUser.userCode.toUpperCase(),
@@ -263,20 +300,37 @@ const AdminPanel: React.FC = () => {
         updatedAt: new Date()
       };
 
+      console.log('💾 User data being saved to Firestore:', JSON.stringify(userToSave, null, 2));
+
       if (editingUser) {
+        console.log('📝 Updating existing user:', editingUser.id);
         await updateDoc(doc(db, 'users', editingUser.id), userToSave);
         setMessage(`User "${userToSave.name}" updated successfully!`);
       } else {
+        // Check if user with this code already exists before creating
+        console.log('🔍 Checking for existing user with code:', userToSave.userCode);
+        const existingUsers = await getDocs(collection(db, 'users'));
+        const duplicateUser = existingUsers.docs.find(doc => 
+          doc.data().userCode === userToSave.userCode
+        );
+        
+        if (duplicateUser) {
+          setMessage(`⚠️ User with code "${userToSave.userCode}" already exists!`);
+          setLoading(false);
+          return;
+        }
+
+        console.log('✅ No duplicate found, creating new user');
         await addDoc(collection(db, 'users'), userToSave);
         setMessage(`User "${userToSave.name}" created successfully!`);
       }
 
       setOpenUserDialog(false);
       setEditingUser(null);
-      setNewUser({ name: '', userCode: '', role: 'applicator', email: '', isActive: true });
+      setNewUser({ name: '', userCode: '', role: 'applicator', email: '', isActive: true, canAccessReports: false });
       loadUsers();
     } catch (error) {
-      console.error('Error saving user:', error);
+      console.error('❌ Error saving user:', error);
       setMessage('Error saving user');
     } finally {
       setLoading(false);
@@ -340,6 +394,59 @@ const AdminPanel: React.FC = () => {
     } catch (error) {
       console.error('Error saving kiosk:', error);
       setMessage('Error saving kiosk. Check Firestore permissions.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditUser = (user: any) => {
+    console.log('✏️ Editing user:', user);
+    console.log('🔍 User canAccessReports field:', user.canAccessReports, 'Type:', typeof user.canAccessReports);
+    
+    setEditingUser(user);
+    
+    const editUserData = {
+      name: user.name || '',
+      userCode: user.userCode || '',
+      role: user.role || 'applicator',
+      email: user.email || '',
+      isActive: user.isActive !== undefined ? user.isActive : true,
+      canAccessReports: Boolean(user.canAccessReports) // Ensure it's a boolean
+    };
+    
+    console.log('📝 Setting newUser data:', editUserData);
+    setNewUser(editUserData);
+    setOpenUserDialog(true);
+    
+    // Scroll to edit form after a short delay to ensure dialog has opened
+    setTimeout(() => {
+      editFormRef.current?.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'start' 
+      });
+    }, 100);
+  };
+
+  const handleDeleteUser = async (user: any) => {
+    const confirmDelete = window.confirm(
+      `Are you sure you want to delete user "${user.name}" (${user.userCode})?\n\nThis action cannot be undone.`
+    );
+    
+    if (!confirmDelete) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      console.log('🗑️ Deleting user:', user.id);
+      
+      await deleteDoc(doc(db, 'users', user.id));
+      setMessage(`User "${user.name}" deleted successfully!`);
+      loadUsers(); // Refresh the user list
+      
+    } catch (error) {
+      console.error('❌ Error deleting user:', error);
+      setMessage('Error deleting user. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -500,7 +607,15 @@ const AdminPanel: React.FC = () => {
 
       {/* Navigation Cards */}
       <Grid container spacing={4} justifyContent="center" sx={{ mb: 4 }}>
-        {navigationItems.map((item, index) => (
+        {navigationItems
+          .filter(item => {
+            // Filter out View Reports for managers without permission
+            if (item.title === 'View Reports') {
+              return user?.role === 'admin' || (user?.role === 'manager' && user?.canAccessReports);
+            }
+            return true;
+          })
+          .map((item, index) => (
           <Grid item xs={12} sm={6} md={4} key={index}>
             <Card
               sx={{
@@ -628,6 +743,7 @@ const AdminPanel: React.FC = () => {
               <Grid container spacing={2}>
                 <Grid item xs={12} sm={6}>
                   <TextField
+                    id="kiosk-name"
                     fullWidth
                     label="Kiosk Name"
                     value={newKiosk.name}
@@ -637,8 +753,10 @@ const AdminPanel: React.FC = () => {
                 </Grid>
                 <Grid item xs={12} sm={6}>
                   <FormControl fullWidth margin="dense">
-                    <InputLabel>Kiosk Type</InputLabel>
+                    <InputLabel id="kiosk-type-label">Kiosk Type</InputLabel>
                     <Select
+                      labelId="kiosk-type-label"
+                      id="kiosk-type"
                       value={newKiosk.type}
                       label="Kiosk Type"
                       onChange={(e) => setNewKiosk({...newKiosk, type: e.target.value})}
@@ -651,6 +769,7 @@ const AdminPanel: React.FC = () => {
                 </Grid>
                 <Grid item xs={12}>
                   <TextField
+                    id="kiosk-description"
                     fullWidth
                     label="Description"
                     value={newKiosk.description}
@@ -662,6 +781,7 @@ const AdminPanel: React.FC = () => {
                 </Grid>
                 <Grid item xs={12}>
                   <TextField
+                    id="kiosk-location"
                     fullWidth
                     label="Location"
                     value={newKiosk.location}
@@ -709,6 +829,7 @@ const AdminPanel: React.FC = () => {
                             }}
                           >
                             <Checkbox
+                              id={`kiosk-application-${application.id}`}
                               checked={newKiosk.availableApplications?.includes(application.id) || false}
                               onChange={(e) => {
                                 console.log('📌 Application checkbox changed!', application.name, application.id, 'New state:', e.target.checked);
@@ -762,6 +883,7 @@ const AdminPanel: React.FC = () => {
                               }}
                             >
                               <Checkbox
+                                id={`kiosk-product-${product.id}`}
                                 checked={newKiosk.availableProducts?.includes(product.id) || false}
                                 onChange={(e) => {
                                   console.log('📌 Checkbox changed!', product.name, product.id, 'New state:', e.target.checked);
@@ -852,6 +974,7 @@ const AdminPanel: React.FC = () => {
                   <TableCell>User Code</TableCell>
                   <TableCell>Role</TableCell>
                   <TableCell>Status</TableCell>
+                  <TableCell>Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -862,7 +985,7 @@ const AdminPanel: React.FC = () => {
                     <TableCell>
                       <Chip 
                         label={user.role} 
-                        color={user.role === 'admin' ? 'secondary' : 'primary'}
+                        color={user.role === 'admin' ? 'secondary' : user.role === 'manager' ? 'warning' : 'primary'}
                         size="small"
                       />
                     </TableCell>
@@ -872,6 +995,28 @@ const AdminPanel: React.FC = () => {
                         color={user.isActive ? 'success' : 'default'}
                         size="small"
                       />
+                    </TableCell>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', gap: 1 }}>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color="primary"
+                          onClick={() => handleEditUser(user)}
+                          sx={{ minWidth: 'auto', px: 2 }}
+                        >
+                          ✏️ Edit
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color="error"
+                          onClick={() => handleDeleteUser(user)}
+                          sx={{ minWidth: 'auto', px: 2 }}
+                        >
+                          🗑️ Delete
+                        </Button>
+                      </Box>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -883,14 +1028,14 @@ const AdminPanel: React.FC = () => {
             variant="contained"
             onClick={() => {
               setEditingUser(null);
-              setNewUser({ name: '', userCode: '', role: 'applicator', email: '', isActive: true });
+              setNewUser({ name: '', userCode: '', role: 'applicator', email: '', isActive: true, canAccessReports: false });
             }}
           >
             Add New User
           </Button>
 
           {/* User Form */}
-          <Box sx={{ mt: 3 }}>
+          <Box ref={editFormRef} sx={{ mt: 3 }}>
             <Typography variant="h6" gutterBottom>
               {editingUser ? 'Edit User' : 'Add New User'}
             </Typography>
@@ -898,6 +1043,7 @@ const AdminPanel: React.FC = () => {
             <Grid container spacing={2}>
               <Grid item xs={12} sm={6}>
                 <TextField
+                  id="user-full-name"
                   fullWidth
                   label="Full Name"
                   value={newUser.name}
@@ -907,6 +1053,7 @@ const AdminPanel: React.FC = () => {
               </Grid>
               <Grid item xs={12} sm={6}>
                 <TextField
+                  id="user-code"
                   fullWidth
                   label="User Code"
                   value={newUser.userCode}
@@ -917,19 +1064,32 @@ const AdminPanel: React.FC = () => {
               </Grid>
               <Grid item xs={12} sm={6}>
                 <FormControl fullWidth margin="dense">
-                  <InputLabel>Role</InputLabel>
+                  <InputLabel id="user-role-label">Role</InputLabel>
                   <Select
+                    labelId="user-role-label"
+                    id="user-role"
                     value={newUser.role}
                     label="Role"
-                    onChange={(e) => setNewUser({...newUser, role: e.target.value})}
+                    onChange={(e) => {
+                      const newRole = e.target.value;
+                      console.log('🎭 Role changed to:', newRole);
+                      setNewUser({
+                        ...newUser, 
+                        role: newRole,
+                        // Preserve or initialize canAccessReports when switching to manager
+                        canAccessReports: newRole === 'manager' ? (newUser.canAccessReports || false) : false
+                      });
+                    }}
                   >
                     <MenuItem value="applicator">Applicator</MenuItem>
+                    <MenuItem value="manager">Manager</MenuItem>
                     <MenuItem value="admin">Administrator</MenuItem>
                   </Select>
                 </FormControl>
               </Grid>
               <Grid item xs={12} sm={6}>
                 <TextField
+                  id="user-email"
                   fullWidth
                   label="Email"
                   type="email"
@@ -939,6 +1099,46 @@ const AdminPanel: React.FC = () => {
                 />
               </Grid>
             </Grid>
+            
+            {/* Reports Permission for Managers */}
+            {newUser.role === 'manager' && (
+              <Box sx={{ mt: 2, p: 2, bgcolor: 'warning.light', borderRadius: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, p: 2, border: '1px solid #ddd', borderRadius: 1 }}>
+                  <Checkbox
+                    id="user-reports-access"
+                    checked={Boolean(newUser.canAccessReports)}
+                    readOnly
+                    color="primary"
+                  />
+                  <Box sx={{ flexGrow: 1 }}>
+                    <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                      Reports Access Permission
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Allow this manager to view reports and analytics
+                    </Typography>
+                  </Box>
+                  <Button
+                    variant={newUser.canAccessReports ? "contained" : "outlined"}
+                    color={newUser.canAccessReports ? "success" : "primary"}
+                    onClick={() => {
+                      const newValue = !newUser.canAccessReports;
+                      console.log('✅ Toggling reports access to:', newValue);
+                      setNewUser({
+                        ...newUser,
+                        canAccessReports: newValue
+                      });
+                    }}
+                    sx={{ minWidth: 100 }}
+                  >
+                    {newUser.canAccessReports ? '✓ Enabled' : 'Enable'}
+                  </Button>
+                </Box>
+                <Typography variant="caption" display="block" sx={{ mt: 1, color: 'text.secondary' }}>
+                  ⚠️ Only grant reports access to trusted managers. Reports contain sensitive business data.
+                </Typography>
+              </Box>
+            )}
             
             <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
               <Button
@@ -952,7 +1152,7 @@ const AdminPanel: React.FC = () => {
                 variant="outlined"
                 onClick={() => {
                   setEditingUser(null);
-                  setNewUser({ name: '', userCode: '', role: 'applicator', email: '', isActive: true });
+                  setNewUser({ name: '', userCode: '', role: 'applicator', email: '', isActive: true, canAccessReports: false });
                   setOpenUserDialog(false);
                 }}
               >
@@ -963,17 +1163,6 @@ const AdminPanel: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Success/Error Messages */}
-      <Snackbar
-        open={!!message}
-        autoHideDuration={6000}
-        onClose={() => setMessage('')}
-        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-      >
-        <Alert onClose={() => setMessage('')} severity="info">
-          {message}
-        </Alert>
-      </Snackbar>
     </Container>
   );
 };

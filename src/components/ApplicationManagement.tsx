@@ -112,10 +112,10 @@ const ApplicationManagement: React.FC = () => {
 
   // Helper function to migrate legacy product data (add equipmentTypes if missing)
   const migrateLegacyProduct = (product: any): ApplicationProduct => {
+    let equipmentTypes: ('hose-truck' | 'trailer' | 'cart-truck' | 'backpack')[] = [];
+    
     if (!product.equipmentTypes) {
       // For legacy products, convert old truckTypes to new equipmentTypes
-      const equipmentTypes: ('hose-truck' | 'trailer' | 'cart-truck' | 'backpack')[] = [];
-      
       if (product.truckTypes) {
         // Migrate from old truckTypes format
         if (product.truckTypes.includes('hose')) {
@@ -134,16 +134,38 @@ const ApplicationManagement: React.FC = () => {
         }
       }
       
-      return {
-        ...product,
-        equipmentTypes: equipmentTypes.length > 0 ? equipmentTypes : ['cart-truck', 'backpack']
-      };
+      if (equipmentTypes.length === 0) {
+        equipmentTypes = ['cart-truck', 'backpack'];
+      }
+    } else {
+      equipmentTypes = [...product.equipmentTypes];
     }
-    return product;
+
+    // Clean up equipment types - remove those without valid rates
+    const validEquipmentTypes = equipmentTypes.filter(equipType => {
+      switch (equipType) {
+        case 'hose-truck':
+          return product.hoseRate && product.hoseRate > 0;
+        case 'trailer':
+          return product.trailerRate && product.trailerRate > 0;
+        case 'cart-truck':
+          return product.cartRate && product.cartRate > 0;
+        case 'backpack':
+          return product.backpackRate && product.backpackRate > 0;
+        default:
+          return false;
+      }
+    });
+    
+    return {
+      ...product,
+      equipmentTypes: validEquipmentTypes.length > 0 ? validEquipmentTypes : ['cart-truck']
+    };
   };
   const [applications, setApplications] = useState<Application[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [openDialog, setOpenDialog] = useState(false);
   const [editingApplication, setEditingApplication] = useState<Application | null>(null);
   const [message, setMessage] = useState('');
@@ -175,6 +197,17 @@ const ApplicationManagement: React.FC = () => {
     loadApplications();
     loadProducts();
   }, []);
+
+  // Debug: Monitor editing application changes
+  useEffect(() => {
+    if (editingApplication) {
+      console.log('🔄 EditingApplication state changed:', {
+        name: editingApplication.name,
+        category: editingApplication.category,
+        id: editingApplication.id
+      });
+    }
+  }, [editingApplication?.category, editingApplication?.name]);
 
   const loadApplications = async () => {
     try {
@@ -276,11 +309,10 @@ const ApplicationManagement: React.FC = () => {
       });
       
       // Create a clean object without undefined fields for Firestore
-      const applicationData = {
+      const applicationData: any = {
         name: newApplication.name || '',
         description: newApplication.description || '',
         category: newApplication.category || 'mixed',
-        applicationCategory: newApplication.applicationCategory || undefined,
         products: newApplication.products || [],
         isActive: newApplication.isActive !== undefined ? newApplication.isActive : true,
         isDefault: newApplication.isDefault !== undefined ? newApplication.isDefault : false,
@@ -288,6 +320,12 @@ const ApplicationManagement: React.FC = () => {
         createdAt: new Date(),
         updatedAt: new Date()
       };
+      
+      // Only add applicationCategory if it has a valid value
+      if (newApplication.applicationCategory && 
+          (newApplication.applicationCategory === 'trees' || newApplication.applicationCategory === 'other')) {
+        applicationData.applicationCategory = newApplication.applicationCategory;
+      }
       
       console.log('📝 Clean application data:', applicationData);
       
@@ -314,32 +352,101 @@ const ApplicationManagement: React.FC = () => {
   };
 
   const handleEditApplication = async () => {
-    if (!editingApplication) return;
+    console.log('🔄 Starting handleEditApplication...');
+    
+    if (saving) {
+      console.log('⏳ Already saving, skipping...');
+      return;
+    }
+    
+    if (!editingApplication) {
+      console.log('❌ No editing application found');
+      setMessage('No application selected for editing');
+      return;
+    }
+    
+    console.log('📝 Editing application:', {
+      id: editingApplication.id,
+      name: editingApplication.name,
+      category: editingApplication.category,
+      products: editingApplication.products?.length || 0,
+      availableKiosks: editingApplication.availableKiosks
+    });
     
     if (!editingApplication.name.trim()) {
+      console.log('❌ Application name is empty');
       setMessage('Application name is required');
       return;
     }
     
+
+    
+    setSaving(true);
     try {
-      await updateDoc(doc(db, 'applications', editingApplication.id), {
-        name: editingApplication.name,
-        description: editingApplication.description,
-        category: editingApplication.category,
-        applicationCategory: editingApplication.applicationCategory,
-        products: editingApplication.products,
-        isActive: editingApplication.isActive,
+      console.log('💾 Updating application in Firestore...');
+      console.log('🆔 Application ID:', editingApplication.id);
+      console.log('🏪 Database project:', db.app.options.projectId);
+      
+      // Verify document exists
+      const docRef = doc(db, 'applications', editingApplication.id);
+      console.log('📄 Document reference:', docRef.path);
+      
+      // Clean up products before saving
+      const cleanedProducts = editingApplication.products.map(product => migrateLegacyProduct(product));
+      console.log('🧹 Cleaned products count:', cleanedProducts.length);
+      
+      // Validate category
+      const validCategories = ['fertilizer', 'herbicide', 'insecticide', 'pre-emergent', 'spreader-sticker', 'mixed'];
+      const category = editingApplication.category || 'mixed';
+      
+      if (!validCategories.includes(category)) {
+        console.log('❌ Invalid category:', category);
+        setMessage(`Invalid category: ${category}. Must be one of: ${validCategories.join(', ')}`);
+        return;
+      }
+      
+      console.log('✅ Category validation passed:', category);
+      
+      // Build update data - only include applicationCategory if it has a valid value
+      const updateData: any = {
+        name: editingApplication.name.trim(),
+        description: editingApplication.description || '',
+        category: category,
+        products: cleanedProducts,
+        isActive: editingApplication.isActive !== undefined ? editingApplication.isActive : true,
         isDefault: editingApplication.isDefault || false,
         availableKiosks: editingApplication.availableKiosks || ['mixed'],
         updatedAt: new Date()
-      });
+      };
+      
+      // Only add applicationCategory if it has a valid value (not undefined/null/empty)
+      if (editingApplication.applicationCategory && 
+          (editingApplication.applicationCategory === 'trees' || editingApplication.applicationCategory === 'other')) {
+        updateData.applicationCategory = editingApplication.applicationCategory;
+      }
+      
+      console.log('📊 Update data:', updateData);
+      console.log('📊 Category being saved:', updateData.category);
+      
+      await updateDoc(docRef, updateData);
+      
+      console.log('✅ Application updated successfully in Firestore!');
+      console.log('✅ Updated category to:', updateData.category);
       setMessage('Application updated successfully!');
       setOpenDialog(false);
       setEditingApplication(null);
       loadApplications();
     } catch (error) {
-      console.error('Error updating application:', error);
-      setMessage('Error updating application: ' + (error as Error).message);
+      console.error('❌ Error updating application:', {
+        error: error,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        code: (error as any)?.code,
+        details: (error as any)?.details,
+        stack: error instanceof Error ? error.stack : 'No stack trace'
+      });
+      setMessage('Error updating application: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -377,6 +484,48 @@ const ApplicationManagement: React.FC = () => {
         console.error('Error deleting application:', error);
         setMessage('Error deleting application: ' + (error as Error).message);
       }
+    }
+  };
+
+  // Function to clean up all applications - remove invalid equipment types
+  const cleanupAllApplications = async () => {
+    if (!window.confirm('This will clean up all applications by removing invalid equipment types from products. Continue?')) {
+      return;
+    }
+
+    try {
+      const querySnapshot = await getDocs(collection(db, 'applications'));
+      const batch = writeBatch(db);
+      let updatedCount = 0;
+
+      querySnapshot.docs.forEach((document) => {
+        const application = document.data() as Application;
+        if (application.products && application.products.length > 0) {
+          const cleanedProducts = application.products.map(product => migrateLegacyProduct(product));
+          
+          // Check if any changes were made
+          const hasChanges = JSON.stringify(application.products) !== JSON.stringify(cleanedProducts);
+          
+          if (hasChanges) {
+            batch.update(doc(db, 'applications', document.id), {
+              products: cleanedProducts,
+              updatedAt: new Date()
+            });
+            updatedCount++;
+          }
+        }
+      });
+
+      if (updatedCount > 0) {
+        await batch.commit();
+        setMessage(`Cleaned up ${updatedCount} applications successfully!`);
+        loadApplications();
+      } else {
+        setMessage('No applications needed cleanup.');
+      }
+    } catch (error) {
+      console.error('Error cleaning up applications:', error);
+      setMessage('Error cleaning up applications: ' + (error as Error).message);
     }
   };
 
@@ -418,6 +567,27 @@ const ApplicationManagement: React.FC = () => {
       return;
     }
 
+    // Filter out equipment types that don't have valid rates
+    const validEquipmentTypes = selectedEquipmentTypes.filter(equipType => {
+      switch (equipType) {
+        case 'hose-truck':
+          return selectedProduct.hoseRatePerGallon && selectedProduct.hoseRatePerGallon > 0;
+        case 'trailer':
+          return selectedProduct.trailerRatePerGallon && selectedProduct.trailerRatePerGallon > 0;
+        case 'cart-truck':
+          return selectedProduct.cartRatePerGallon && selectedProduct.cartRatePerGallon > 0;
+        case 'backpack':
+          return selectedProduct.backpackRatePerGallon && selectedProduct.backpackRatePerGallon > 0;
+        default:
+          return false;
+      }
+    });
+
+    if (validEquipmentTypes.length === 0) {
+      setMessage('Selected equipment types are not valid for this product');
+      return;
+    }
+
     const applicationProduct: ApplicationProduct = {
       productId: selectedProduct.id,
       productName: selectedProduct.name,
@@ -427,7 +597,7 @@ const ApplicationManagement: React.FC = () => {
       trailerRate: selectedProduct.trailerRatePerGallon || 0,
       backpackRate: selectedProduct.backpackRatePerGallon || 0,
       unit: selectedProduct.unit,
-      equipmentTypes: [...selectedEquipmentTypes]
+      equipmentTypes: validEquipmentTypes
     };
 
     if (editingApplication) {
@@ -477,8 +647,24 @@ const ApplicationManagement: React.FC = () => {
   };
 
   const handleEditProductInApplication = (product: ApplicationProduct) => {
+    // Clean up equipment types when editing to prevent invalid selections
+    const validEquipmentTypes = (product.equipmentTypes || []).filter(equipType => {
+      switch (equipType) {
+        case 'hose-truck':
+          return product.hoseRate && product.hoseRate > 0;
+        case 'trailer':
+          return product.trailerRate && product.trailerRate > 0;
+        case 'cart-truck':
+          return product.cartRate && product.cartRate > 0;
+        case 'backpack':
+          return product.backpackRate && product.backpackRate > 0;
+        default:
+          return false;
+      }
+    });
+    
     setEditingProduct(product);
-    setSelectedEquipmentTypes(product.equipmentTypes || []);
+    setSelectedEquipmentTypes(validEquipmentTypes);
     setOpenEditProductDialog(true);
   };
 
@@ -488,9 +674,30 @@ const ApplicationManagement: React.FC = () => {
       return;
     }
 
+    // Filter out equipment types that don't have valid rates
+    const validEquipmentTypes = selectedEquipmentTypes.filter(equipType => {
+      switch (equipType) {
+        case 'hose-truck':
+          return editingProduct.hoseRate && editingProduct.hoseRate > 0;
+        case 'trailer':
+          return editingProduct.trailerRate && editingProduct.trailerRate > 0;
+        case 'cart-truck':
+          return editingProduct.cartRate && editingProduct.cartRate > 0;
+        case 'backpack':
+          return editingProduct.backpackRate && editingProduct.backpackRate > 0;
+        default:
+          return false;
+      }
+    });
+
+    if (validEquipmentTypes.length === 0) {
+      setMessage('Selected equipment types are not valid for this product');
+      return;
+    }
+
     const updatedProduct: ApplicationProduct = {
       ...editingProduct,
-      equipmentTypes: [...selectedEquipmentTypes]
+      equipmentTypes: validEquipmentTypes
     };
 
     if (editingApplication) {
@@ -571,14 +778,25 @@ const ApplicationManagement: React.FC = () => {
           <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main' }}>
             Application Recipes
           </Typography>
-          <Button 
-            variant="contained" 
-            startIcon={<AddIcon />}
-            onClick={openAddDialog}
-            size="large"
-          >
-            Create New Application
-          </Button>
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            <Button 
+              variant="outlined" 
+              color="warning"
+              onClick={cleanupAllApplications}
+              size="medium"
+              title="Clean up all applications by removing invalid equipment types"
+            >
+              🔧 Cleanup Data
+            </Button>
+            <Button 
+              variant="contained" 
+              startIcon={<AddIcon />}
+              onClick={openAddDialog}
+              size="large"
+            >
+              Create New Application
+            </Button>
+          </Box>
         </Box>
 
         {/* Applications Overview */}
@@ -1273,12 +1491,22 @@ const ApplicationManagement: React.FC = () => {
             </Grid>
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setOpenDialog(false)}>Cancel</Button>
+            <Button 
+              onClick={() => {
+                setOpenDialog(false);
+                setEditingApplication(null);
+                setSaving(false);
+              }}
+              disabled={saving}
+            >
+              Cancel
+            </Button>
             <Button 
               onClick={editingApplication ? handleEditApplication : handleAddApplication}
               variant="contained"
+              disabled={saving}
             >
-              {editingApplication ? 'Update' : 'Create'}
+              {saving ? 'Saving...' : (editingApplication ? 'Update' : 'Create')}
             </Button>
           </DialogActions>
         </Dialog>
@@ -1325,7 +1553,7 @@ const ApplicationManagement: React.FC = () => {
                   <Chip
                     icon={<HoseTruckIcon />}
                     label={`Hose Truck (${selectedProduct.hoseRatePerGallon || 0} ${selectedProduct.unit}/gal)`}
-                    clickable
+                    clickable={Boolean(selectedProduct.hoseRatePerGallon && selectedProduct.hoseRatePerGallon > 0)}
                     color={selectedEquipmentTypes.includes('hose-truck') ? 'primary' : 'default'}
                     variant={selectedEquipmentTypes.includes('hose-truck') ? 'filled' : 'outlined'}
                     onClick={() => {
@@ -1338,11 +1566,13 @@ const ApplicationManagement: React.FC = () => {
                       }
                     }}
                     disabled={!selectedProduct.hoseRatePerGallon || selectedProduct.hoseRatePerGallon <= 0}
+                    sx={(!selectedProduct.hoseRatePerGallon || selectedProduct.hoseRatePerGallon <= 0) ? 
+                      { opacity: 0.5, cursor: 'not-allowed' } : {}}
                   />
                   <Chip
                     icon={<TrailerIcon />}
                     label={`Trailer (${selectedProduct.trailerRatePerGallon || 0} ${selectedProduct.unit}/gal)`}
-                    clickable
+                    clickable={Boolean(selectedProduct.trailerRatePerGallon && selectedProduct.trailerRatePerGallon > 0)}
                     color={selectedEquipmentTypes.includes('trailer') ? 'primary' : 'default'}
                     variant={selectedEquipmentTypes.includes('trailer') ? 'filled' : 'outlined'}
                     onClick={() => {
@@ -1355,11 +1585,13 @@ const ApplicationManagement: React.FC = () => {
                       }
                     }}
                     disabled={!selectedProduct.trailerRatePerGallon || selectedProduct.trailerRatePerGallon <= 0}
+                    sx={(!selectedProduct.trailerRatePerGallon || selectedProduct.trailerRatePerGallon <= 0) ? 
+                      { opacity: 0.5, cursor: 'not-allowed' } : {}}
                   />
                   <Chip
                     icon={<CartTruckIcon />}
                     label={`Cart Truck (${selectedProduct.cartRatePerGallon || 0} ${selectedProduct.unit}/gal)`}
-                    clickable
+                    clickable={Boolean(selectedProduct.cartRatePerGallon && selectedProduct.cartRatePerGallon > 0)}
                     color={selectedEquipmentTypes.includes('cart-truck') ? 'secondary' : 'default'}
                     variant={selectedEquipmentTypes.includes('cart-truck') ? 'filled' : 'outlined'}
                     onClick={() => {
@@ -1372,11 +1604,13 @@ const ApplicationManagement: React.FC = () => {
                       }
                     }}
                     disabled={!selectedProduct.cartRatePerGallon || selectedProduct.cartRatePerGallon <= 0}
+                    sx={(!selectedProduct.cartRatePerGallon || selectedProduct.cartRatePerGallon <= 0) ? 
+                      { opacity: 0.5, cursor: 'not-allowed' } : {}}
                   />
                   <Chip
                     icon={<BackpackIcon />}
                     label={`Backpack (${selectedProduct.backpackRatePerGallon || 0} ${selectedProduct.unit}/gal)`}
-                    clickable
+                    clickable={Boolean(selectedProduct.backpackRatePerGallon && selectedProduct.backpackRatePerGallon > 0)}
                     color={selectedEquipmentTypes.includes('backpack') ? 'secondary' : 'default'}
                     variant={selectedEquipmentTypes.includes('backpack') ? 'filled' : 'outlined'}
                     onClick={() => {
@@ -1389,6 +1623,8 @@ const ApplicationManagement: React.FC = () => {
                       }
                     }}
                     disabled={!selectedProduct.backpackRatePerGallon || selectedProduct.backpackRatePerGallon <= 0}
+                    sx={(!selectedProduct.backpackRatePerGallon || selectedProduct.backpackRatePerGallon <= 0) ? 
+                      { opacity: 0.5, cursor: 'not-allowed' } : {}}
                   />
                 </Box>
                 {selectedEquipmentTypes.length === 0 && (
@@ -1438,7 +1674,7 @@ const ApplicationManagement: React.FC = () => {
                   <Chip
                     icon={<HoseTruckIcon />}
                     label={`Hose Truck (${editingProduct.hoseRate || 0} ${editingProduct.unit}/gal)`}
-                    clickable
+                    clickable={Boolean(editingProduct.hoseRate && editingProduct.hoseRate > 0)}
                     color={selectedEquipmentTypes.includes('hose-truck') ? 'primary' : 'default'}
                     variant={selectedEquipmentTypes.includes('hose-truck') ? 'filled' : 'outlined'}
                     onClick={() => {
@@ -1451,11 +1687,13 @@ const ApplicationManagement: React.FC = () => {
                       }
                     }}
                     disabled={!editingProduct.hoseRate || editingProduct.hoseRate <= 0}
+                    sx={(!editingProduct.hoseRate || editingProduct.hoseRate <= 0) ? 
+                      { opacity: 0.5, cursor: 'not-allowed' } : {}}
                   />
                   <Chip
                     icon={<TrailerIcon />}
                     label={`Trailer (${editingProduct.trailerRate || 0} ${editingProduct.unit}/gal)`}
-                    clickable
+                    clickable={Boolean(editingProduct.trailerRate && editingProduct.trailerRate > 0)}
                     color={selectedEquipmentTypes.includes('trailer') ? 'primary' : 'default'}
                     variant={selectedEquipmentTypes.includes('trailer') ? 'filled' : 'outlined'}
                     onClick={() => {
@@ -1468,11 +1706,13 @@ const ApplicationManagement: React.FC = () => {
                       }
                     }}
                     disabled={!editingProduct.trailerRate || editingProduct.trailerRate <= 0}
+                    sx={(!editingProduct.trailerRate || editingProduct.trailerRate <= 0) ? 
+                      { opacity: 0.5, cursor: 'not-allowed' } : {}}
                   />
                   <Chip
                     icon={<CartTruckIcon />}
                     label={`Cart Truck (${editingProduct.cartRate || 0} ${editingProduct.unit}/gal)`}
-                    clickable
+                    clickable={Boolean(editingProduct.cartRate && editingProduct.cartRate > 0)}
                     color={selectedEquipmentTypes.includes('cart-truck') ? 'secondary' : 'default'}
                     variant={selectedEquipmentTypes.includes('cart-truck') ? 'filled' : 'outlined'}
                     onClick={() => {
@@ -1485,11 +1725,13 @@ const ApplicationManagement: React.FC = () => {
                       }
                     }}
                     disabled={!editingProduct.cartRate || editingProduct.cartRate <= 0}
+                    sx={(!editingProduct.cartRate || editingProduct.cartRate <= 0) ? 
+                      { opacity: 0.5, cursor: 'not-allowed' } : {}}
                   />
                   <Chip
                     icon={<BackpackIcon />}
                     label={`Backpack (${editingProduct.backpackRate || 0} ${editingProduct.unit}/gal)`}
-                    clickable
+                    clickable={Boolean(editingProduct.backpackRate && editingProduct.backpackRate > 0)}
                     color={selectedEquipmentTypes.includes('backpack') ? 'secondary' : 'default'}
                     variant={selectedEquipmentTypes.includes('backpack') ? 'filled' : 'outlined'}
                     onClick={() => {
@@ -1502,6 +1744,8 @@ const ApplicationManagement: React.FC = () => {
                       }
                     }}
                     disabled={!editingProduct.backpackRate || editingProduct.backpackRate <= 0}
+                    sx={(!editingProduct.backpackRate || editingProduct.backpackRate <= 0) ? 
+                      { opacity: 0.5, cursor: 'not-allowed' } : {}}
                   />
                 </Box>
                 {selectedEquipmentTypes.length === 0 && (

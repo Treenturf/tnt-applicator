@@ -12,8 +12,11 @@ import SplashScreen from './components/SplashScreen';
 import LoginPage from './components/LoginPage.tsx';
 import Dashboard from './components/Dashboard.tsx';
 import AdminPanel from './components/AdminPanel.tsx';
+import ManagerPanel from './components/ManagerPanel.tsx';
 import ProductManagement from './components/ProductManagement.tsx';
+import ProductManagementReadOnly from './components/ProductManagementReadOnly.tsx';
 import ApplicationManagement from './components/ApplicationManagement.tsx';
+import ApplicationManagementReadOnly from './components/ApplicationManagementReadOnly.tsx';
 import Calculator from './components/Calculator.tsx';
 import EquipmentSelector from './components/EquipmentSelector.tsx';
 import Reports from './components/Reports.tsx';
@@ -38,7 +41,10 @@ const theme = createTheme({
 const ProtectedRoute: React.FC<{ 
   children: React.ReactNode;
   requireAdmin?: boolean;
-}> = ({ children, requireAdmin = false }) => {
+  requireManager?: boolean;
+  requireReports?: boolean;
+  allowedRoles?: ('admin' | 'manager' | 'applicator')[];
+}> = ({ children, requireAdmin = false, requireManager = false, requireReports = false, allowedRoles }) => {
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -53,8 +59,30 @@ const ProtectedRoute: React.FC<{
     return <Navigate to="/login" />;
   }
 
-  if (requireAdmin && user.role?.toLowerCase() !== 'admin') {
+  const userRole = user.role?.toLowerCase() as 'admin' | 'manager' | 'applicator';
+
+  // Check specific role requirements
+  if (requireAdmin && userRole !== 'admin') {
     return <Navigate to="/dashboard" />;
+  }
+
+  if (requireManager && userRole !== 'manager' && userRole !== 'admin') {
+    return <Navigate to="/dashboard" />;
+  }
+
+  // Check allowed roles
+  if (allowedRoles && !allowedRoles.includes(userRole)) {
+    return <Navigate to="/dashboard" />;
+  }
+
+  // Check reports permission for managers
+  if (requireReports && userRole === 'manager' && !user.canAccessReports) {
+    console.log('🚫 Manager reports access denied - canAccessReports:', user.canAccessReports);
+    return <Navigate to="/dashboard" />;
+  }
+  
+  if (requireReports && userRole === 'manager' && user.canAccessReports) {
+    console.log('✅ Manager reports access granted - canAccessReports:', user.canAccessReports);
   }
 
   return <>{children}</>;
@@ -116,33 +144,33 @@ const AppContent: React.FC = () => {
           </ProtectedRoute>
         } />
         <Route path="/reports" element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={['admin', 'manager']} requireReports={true}>
             <Reports />
           </ProtectedRoute>
         } />
         <Route path="/reports/analytics" element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={['admin', 'manager']} requireReports={true}>
             <DatabaseErrorBoundary component="Analytics">
               <Analytics />
             </DatabaseErrorBoundary>
           </ProtectedRoute>
         } />
         <Route path="/reports/todays-loading" element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={['admin', 'manager']} requireReports={true}>
             <DatabaseErrorBoundary component="Today's Loading Totals">
               <TodaysLoadingTotals />
             </DatabaseErrorBoundary>
           </ProtectedRoute>
         } />
         <Route path="/reports/login-report" element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={['admin', 'manager']} requireReports={true}>
             <DatabaseErrorBoundary component="Login Report">
               <LoginReport />
             </DatabaseErrorBoundary>
           </ProtectedRoute>
         } />
         <Route path="/reports/product-totals" element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={['admin', 'manager']} requireReports={true}>
             <DatabaseErrorBoundary component="Product Totals">
               <ProductTotals />
             </DatabaseErrorBoundary>
@@ -166,6 +194,29 @@ const AppContent: React.FC = () => {
           <ProtectedRoute requireAdmin>
             <ErrorBoundary>
               <ApplicationManagement />
+            </ErrorBoundary>
+          </ProtectedRoute>
+        } />
+        
+        {/* Manager Routes */}
+        <Route path="/manager" element={
+          <ProtectedRoute allowedRoles={['manager', 'admin']}>
+            <ErrorBoundary>
+              <ManagerPanel />
+            </ErrorBoundary>
+          </ProtectedRoute>
+        } />
+        <Route path="/manager/products" element={
+          <ProtectedRoute allowedRoles={['manager', 'admin']}>
+            <ErrorBoundary>
+              <ProductManagementReadOnly />
+            </ErrorBoundary>
+          </ProtectedRoute>
+        } />
+        <Route path="/manager/applications" element={
+          <ProtectedRoute allowedRoles={['manager', 'admin']}>
+            <ErrorBoundary>
+              <ApplicationManagementReadOnly />
             </ErrorBoundary>
           </ProtectedRoute>
         } />

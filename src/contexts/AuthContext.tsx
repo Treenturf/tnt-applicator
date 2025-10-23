@@ -5,8 +5,9 @@ import { db } from '../firebase';
 interface UserProfile {
   userCode: string;
   name: string;
-  role: 'admin' | 'applicator';
+  role: 'admin' | 'manager' | 'applicator';
   isActive: boolean;
+  canAccessReports?: boolean; // Optional permission for managers to access reports
 }
 
 interface AuthContextType {
@@ -104,6 +105,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const userDoc = querySnapshot.docs[0];
         const userData = userDoc.data() as UserProfile;
         console.log('✅ User found:', userData);
+        
+        // Debug manager reports permission
+        if (userData.role === 'manager') {
+          console.log('👔 Manager user logged in - canAccessReports:', userData.canAccessReports);
+        }
         
         setUser(userData);
         localStorage.setItem('tnt-user', JSON.stringify(userData));

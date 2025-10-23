@@ -1,13 +1,13 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// https://vite.dev/config/
+// Alternative configuration with different port to avoid conflicts
 export default defineConfig({
   plugins: [react()],
   server: {
     host: '0.0.0.0', // Allow network access
-    port: 5173,
+    port: 5175,      // Changed from 5173 to avoid conflicts
     strictPort: false, // Allow fallback to next available port
-    open: false       // Don't auto-open browser to avoid conflicts
+    open: false      // Don't auto-open browser
   }
 })

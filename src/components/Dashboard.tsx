@@ -211,6 +211,14 @@ const Dashboard: React.FC = () => {
       action: () => navigate('/admin'),
       color: 'secondary.main',
       available: user?.role?.toLowerCase() === 'admin' && (currentKiosk?.type === 'specialty' || currentKiosk?.type === 'mixed')
+    },
+    {
+      title: 'Manager Panel',
+      description: 'Manage kiosks and default applications',
+      icon: <Typography sx={{ fontSize: 40 }}>👨‍💼</Typography>,
+      action: () => navigate('/manager'),
+      color: 'warning.main',
+      available: user?.role?.toLowerCase() === 'manager' && (currentKiosk?.type === 'specialty' || currentKiosk?.type === 'mixed')
     }
   ];
 
@@ -291,7 +299,8 @@ const Dashboard: React.FC = () => {
                 {user?.name}
               </Typography>
               <Typography variant="caption">
-                {user?.role?.toLowerCase() === 'admin' ? 'Admin' : 'Applicator'}
+                {user?.role?.toLowerCase() === 'admin' ? 'Admin' : 
+                 user?.role?.toLowerCase() === 'manager' ? 'Manager' : 'Applicator'}
               </Typography>
             </Box>
             {user?.role?.toLowerCase() === 'admin' && (
@@ -306,6 +315,18 @@ const Dashboard: React.FC = () => {
               >
                 Exit Kiosk
               </Button>
+            )}
+            {user?.role?.toLowerCase() === 'manager' && (
+              <Chip 
+                label="Manager Mode" 
+                color="warning" 
+                size="small" 
+                sx={{ 
+                  bgcolor: 'rgba(255,255,255,0.2)', 
+                  color: 'white',
+                  '& .MuiChip-label': { color: 'white' }
+                }} 
+              />
             )}
             <Button 
               color="inherit" 
