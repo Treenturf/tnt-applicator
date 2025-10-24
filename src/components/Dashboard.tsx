@@ -39,33 +39,56 @@ const Dashboard: React.FC = () => {
   const [applications, setApplications] = useState<Application[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<'trees' | 'other' | null>(null);
 
-  // Load applications for Standard Applications kiosk
+  // Load applications for Standard Applications kiosk (manual loading, not real-time)
   useEffect(() => {
     if (currentKiosk?.type === 'mixed') {
       loadApplications();
     }
   }, [currentKiosk]);
 
+  // Load applications from Firebase based on kiosk configuration
   const loadApplications = async () => {
     try {
-      const applicationsSnapshot = await getDocs(collection(db, 'applications'));
-      const applicationsData = applicationsSnapshot.docs.map(doc => ({
+      console.log('📋 Loading applications for Specialty Kiosk...');
+      console.log('🏭 Current kiosk:', currentKiosk?.name, 'Type:', currentKiosk?.type);
+      console.log('🏪 Available applications from kiosk config:', currentKiosk?.availableApplications);
+      console.log('🏪 Available applications type:', typeof currentKiosk?.availableApplications);
+      console.log('🏪 Available applications length:', currentKiosk?.availableApplications?.length);
+      
+      const applicationsRef = collection(db, 'applications');
+      const snapshot = await getDocs(applicationsRef);
+      
+      const applicationsData = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as Application[];
       
-      // Filter for active applications available on the current kiosk
-      const availableApplications = applicationsData.filter(app => 
-        app.isActive && 
-        app.availableKiosks?.includes(currentKiosk?.type || 'mixed')
-      );
+      console.log('📄 All applications from Firebase:', applicationsData.map(app => `${app.name} (${app.id})`));
       
+      // Only show applications if they are explicitly configured for this kiosk
+      const availableApplicationIds = currentKiosk?.availableApplications || [];
+      console.log('📝 Checking against configured application IDs:', availableApplicationIds);
+      
+      // If no applications are configured, show none
+      if (availableApplicationIds.length === 0) {
+        console.log('❌ No applications configured for this kiosk');
+        setApplications([]);
+        return;
+      }
+      
+      // Filter for applications that are:
+      // 1. Active
+      // 2. Explicitly configured for this kiosk in availableApplications array
+      const availableApplications = applicationsData.filter(app => {
+        const isActive = app.isActive;
+        const isConfiguredForKiosk = availableApplicationIds.includes(app.id);
+        console.log(`  🔍 ${app.name} (${app.id}): Active=${isActive}, ConfiguredForKiosk=${isConfiguredForKiosk}`);
+        return isActive && isConfiguredForKiosk;
+      });
+      
+      console.log('📦 Loaded', availableApplications.length, 'configured applications for Specialty Kiosk');
+      console.log('📦 Available applications:', availableApplications.map(app => app.name));
       setApplications(availableApplications);
-      console.log('📋 Loaded applications for kiosk:', availableApplications);
-      console.log('📋 Applications with categories:', availableApplications.map(app => ({
-        name: app.name,
-        category: app.applicationCategory
-      })));
     } catch (error) {
       console.error('❌ Error loading applications:', error);
     }
@@ -274,7 +297,7 @@ const Dashboard: React.FC = () => {
                     fontWeight: 'bold'
                   }}
                 />
-                {user?.role?.toLowerCase() === 'admin' && (
+                {(user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'manager') && (
                   <Button
                     size="small"
                     color="inherit"
@@ -318,7 +341,7 @@ const Dashboard: React.FC = () => {
             )}
             {user?.role?.toLowerCase() === 'manager' && (
               <Chip 
-                label="Manager Mode" 
+                label="Manager" 
                 color="warning" 
                 size="small" 
                 sx={{ 
@@ -361,13 +384,22 @@ const Dashboard: React.FC = () => {
             </Typography>
             {/* Show selected category for Specialty Apps kiosk */}
             {currentKiosk?.type === 'mixed' && selectedCategory && (
-              <Box sx={{ mt: 2 }}>
+              <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
                 <Chip 
-                  label={selectedCategory === 'trees' ? 'Trees' : 'Other'}
+                  label={`← Back (Currently: ${selectedCategory === 'trees' ? 'Trees' : 'Other'})`}
                   size="medium"
-                  color="success"
-                  sx={{ fontWeight: 'bold', fontSize: '1rem' }}
-                  onDelete={() => setSelectedCategory(null)}
+                  color="primary"
+                  variant="outlined"
+                  sx={{ 
+                    fontWeight: 'bold', 
+                    fontSize: '1rem',
+                    cursor: 'pointer',
+                    '&:hover': {
+                      backgroundColor: 'primary.light',
+                      color: 'white'
+                    }
+                  }}
+                  onClick={() => setSelectedCategory(null)}
                 />
               </Box>
             )}
@@ -426,16 +458,6 @@ const Dashboard: React.FC = () => {
                     <Typography variant="body2" color="text.secondary">
                       {app.description || `${app.products.length} products in recipe`}
                     </Typography>
-                    {app.category && app.category.toLowerCase() !== 'mixed' && (
-                      <Box sx={{ mt: 1 }}>
-                        <Chip 
-                          label={app.category} 
-                          size="small" 
-                          color="primary" 
-                          variant="outlined"
-                        />
-                      </Box>
-                    )}
                   </Box>
                 </CardContent>
                 <CardActions sx={{ justifyContent: 'center', pb: 3 }}>

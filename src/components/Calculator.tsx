@@ -21,7 +21,8 @@ import {
   collection, 
   addDoc,
   getDocs,
-  serverTimestamp 
+  serverTimestamp,
+  onSnapshot
 } from 'firebase/firestore';
 
 // Product interface (enhanced for liquid and granular products)
@@ -162,10 +163,9 @@ const Calculator: React.FC = () => {
       // Auto-open keypad: front tank (driver tank for cart, front tank for hose)
       setActiveInput('frontTank');
     } else {
-      console.log('📌 Mode: Fertilizer Calculator - loading products from Firestore');
-      // Fertilizer mode - load products from Firestore
+      console.log('📌 Mode: Fertilizer Calculator - real-time listener will load products');
+      // Fertilizer mode - real-time listener will load products
       setMode('fertilizer');
-      loadFertilizerProducts();
       setActiveInput('thousandSqFt');
     }
   }, [preSelectedFertilizer, truckType, applicationId, equipmentType]);
@@ -236,41 +236,50 @@ const Calculator: React.FC = () => {
     }
   };
 
-  const loadFertilizerProducts = async () => {
-    try {
-      console.log('🌾 Loading fertilizer products from Firestore...');
-      const productsSnapshot = await getDocs(collection(db, 'products'));
-      const allProducts = productsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as any[];
+  // Load fertilizer products with real-time updates
+  useEffect(() => {
+    if (mode === 'fertilizer') {
+      console.log('🔄 Setting up real-time fertilizer products listener...');
       
-      // Filter for active fertilizer products that have the required poundsPer1000SqFt field
-      let fertilizerProducts = allProducts.filter(p => 
-        p.isActive && 
-        (p.type === 'fertilizer' || p.type === 'granular') &&
-        p.poundsPer1000SqFt !== undefined && 
-        p.poundsPer1000SqFt > 0
-      );
-      
-      // If kiosk has specific products assigned, filter to only those
-      if (currentKiosk?.availableProducts && currentKiosk.availableProducts.length > 0) {
-        console.log('🔒 Filtering products for kiosk:', currentKiosk.name);
-        console.log('  └─ Available product IDs:', currentKiosk.availableProducts);
-        fertilizerProducts = fertilizerProducts.filter(p => 
-          currentKiosk.availableProducts.includes(p.id)
-        );
-        console.log('  └─ Filtered to', fertilizerProducts.length, 'products');
-      }
-      
-      console.log('📦 Loaded fertilizer products:', fertilizerProducts);
-      setProducts(fertilizerProducts);
-    } catch (error) {
-      console.error('❌ Error loading fertilizer products:', error);
-      // Fallback to sample products if Firestore fails
-      setProducts(sampleProducts);
+      const unsubscribe = onSnapshot(collection(db, 'products'), (snapshot) => {
+        try {
+          console.log('🌾 Products updated - reloading fertilizer products...');
+          
+          const allProducts = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          })) as any[];
+          
+          // Filter for active fertilizer products that are available for dry fert kiosk
+          let fertilizerProducts = allProducts.filter(p => 
+            p.isActive && 
+            (p.type === 'fertilizer' || p.type === 'granular') &&
+            p.poundsPer1000SqFt !== undefined && 
+            p.poundsPer1000SqFt > 0 &&
+            p.availableForDryFertKiosk === true
+          );
+          
+          // If kiosk has specific products assigned, filter to only those
+          if (currentKiosk?.availableProducts && currentKiosk.availableProducts.length > 0) {
+            fertilizerProducts = fertilizerProducts.filter(p => 
+              currentKiosk.availableProducts.includes(p.id)
+            );
+          }
+          
+          console.log('📦 Loaded', fertilizerProducts.length, 'fertilizer products for display');
+          setProducts(fertilizerProducts);
+        } catch (error) {
+          console.error('❌ Error in real-time products listener:', error);
+        }
+      });
+
+      // Cleanup function to unsubscribe from the listener
+      return () => {
+        console.log('🧹 Cleaning up fertilizer products listener');
+        unsubscribe();
+      };
     }
-  };
+  }, [mode, currentKiosk]);
 
   // Handle pre-selected fertilizer from URL
   useEffect(() => {
@@ -731,7 +740,7 @@ const Calculator: React.FC = () => {
                 <Typography variant="h6" component="div">
                   Fertilizer Calculator
                 </Typography>
-                {user?.role?.toLowerCase() === 'admin' && (
+                {(user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'manager') && (
                   <Button
                     size="small"
                     color="inherit"
@@ -788,7 +797,21 @@ const Calculator: React.FC = () => {
               Select Your Fertilizer Product
             </Typography>
             <Grid container spacing={3} justifyContent="center">
-              {products.map((product) => (
+              {products.map((product, index) => {
+                // Create distinct colors for each fertilizer product
+                const colors = [
+                  { main: '#4caf50', light: '#81c784', dark: '#388e3c' }, // Green
+                  { main: '#ff9800', light: '#ffb74d', dark: '#f57c00' }, // Orange
+                  { main: '#9c27b0', light: '#ba68c8', dark: '#7b1fa2' }, // Purple
+                  { main: '#f44336', light: '#e57373', dark: '#d32f2f' }, // Red
+                  { main: '#2196f3', light: '#64b5f6', dark: '#1976d2' }, // Blue
+                  { main: '#ff5722', light: '#ff8a65', dark: '#e64a19' }, // Deep Orange
+                  { main: '#795548', light: '#a1887f', dark: '#5d4037' }, // Brown
+                  { main: '#607d8b', light: '#90a4ae', dark: '#455a64' }, // Blue Grey
+                ];
+                const productColor = colors[index % colors.length];
+                
+                return (
                 <Grid item xs={12} sm={6} md={4} key={product.id}>
                   <Card 
                     sx={{ 
@@ -797,12 +820,14 @@ const Calculator: React.FC = () => {
                       flexDirection: 'column',
                       cursor: 'pointer',
                       transition: 'all 0.3s ease',
-                      border: selectedProduct === product.id ? '3px solid' : '1px solid',
-                      borderColor: selectedProduct === product.id ? '#0288d1' : 'grey.300',
+                      border: selectedProduct === product.id ? '3px solid' : '2px solid',
+                      borderColor: selectedProduct === product.id ? productColor.dark : productColor.light,
+                      bgcolor: selectedProduct === product.id ? `${productColor.main}15` : `${productColor.main}08`,
                       '&:hover': {
                         transform: 'translateY(-4px)',
                         boxShadow: 6,
-                        borderColor: '#0288d1'
+                        borderColor: productColor.main,
+                        bgcolor: `${productColor.main}20`
                       }
                     }}
                     onClick={() => {
@@ -811,7 +836,7 @@ const Calculator: React.FC = () => {
                     }}
                   >
                     <CardContent sx={{ flexGrow: 1, textAlign: 'center', pt: 3, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                      <Typography variant="h5" component="h2" gutterBottom sx={{ fontWeight: 'bold', color: '#0288d1' }}>
+                      <Typography variant="h5" component="h2" gutterBottom sx={{ fontWeight: 'bold', color: productColor.dark }}>
                         {product.name}
                       </Typography>
                       <Typography variant="h6" color="text.secondary" sx={{ mt: 2 }}>
@@ -825,7 +850,8 @@ const Calculator: React.FC = () => {
                     </CardContent>
                   </Card>
                 </Grid>
-              ))}
+                );
+              })}
             </Grid>
           </Box>
         )}

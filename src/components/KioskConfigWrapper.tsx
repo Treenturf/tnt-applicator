@@ -17,11 +17,12 @@ const KioskConfigWrapper: React.FC<{ children: React.ReactNode }> = ({ children 
   }
 
   if (!isKioskConfigured) {
-    // Check if user is admin
+    // Check if user is admin or manager
     const isAdmin = user?.role?.toLowerCase() === 'admin';
+    const isManager = user?.role?.toLowerCase() === 'manager';
     
-    if (isAdmin) {
-      // Admins can configure the kiosk
+    if (isAdmin || isManager) {
+      // Admins and managers can configure the kiosk
       return <KioskSelector onKioskSelected={() => {}} />;
     } else {
       // Applicators see a message to contact admin

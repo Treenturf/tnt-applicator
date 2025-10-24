@@ -33,7 +33,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { useKiosk } from '../contexts/KioskContext';
 import { useNavigate } from 'react-router-dom';
-import { collection, getDocs, addDoc, updateDoc, setDoc, doc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, updateDoc, setDoc, doc, deleteDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 
 const AdminPanel: React.FC = () => {
@@ -177,8 +177,32 @@ const AdminPanel: React.FC = () => {
     loadUsers();
     loadProducts();
     loadKiosks();
-    loadApplications();
+    setupApplicationsListener();
   }, []);
+
+  // Setup real-time listener for applications (for admin interface)
+  const setupApplicationsListener = () => {
+    console.log('🔄 AdminPanel: Setting up real-time applications listener...');
+    
+    const unsubscribe = onSnapshot(collection(db, 'applications'), (snapshot) => {
+      try {
+        console.log('📋 AdminPanel: Applications collection updated...');
+        const applicationsData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        
+        const activeApplications = applicationsData.filter((a: any) => a.isActive);
+        setApplications(activeApplications);
+        console.log('💾 AdminPanel: Loaded', activeApplications.length, 'active applications (real-time)');
+      } catch (error) {
+        console.error('❌ AdminPanel: Error in applications listener:', error);
+      }
+    });
+
+    // Store unsubscribe function for cleanup
+    return unsubscribe;
+  };
 
   const loadUsers = async () => {
     try {
@@ -224,30 +248,6 @@ const AdminPanel: React.FC = () => {
     } catch (error) {
       console.error('❌ AdminPanel: Error loading products:', error);
       setMessage('Error loading products');
-    }
-  };
-
-  const loadApplications = async () => {
-    try {
-      console.log('🔍 AdminPanel: Loading applications from Firebase...');
-      const applicationsSnapshot = await getDocs(collection(db, 'applications'));
-      const applicationsData = applicationsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      
-      const activeApplications = applicationsData.filter((a: any) => a.isActive);
-      setApplications(activeApplications);
-      console.log('💾 AdminPanel: Loaded', activeApplications.length, 'active applications');
-      console.log('📋 AdminPanel: Applications with availableKiosks:', 
-        activeApplications.map((app: any) => ({
-          name: app.name,
-          availableKiosks: app.availableKiosks
-        }))
-      );
-    } catch (error) {
-      console.error('❌ AdminPanel: Error loading applications:', error);
-      setMessage('Error loading applications');
     }
   };
 
@@ -842,11 +842,11 @@ const AdminPanel: React.FC = () => {
                 
                 <Grid item xs={12}>
                   <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
-                    {(newKiosk.type === 'specialty' || newKiosk.type === 'mixed') ? 'Default Recipe Selection' : 'Available Products'}
+                    {(newKiosk.type === 'specialty' || newKiosk.type === 'mixed') ? 'Recipe Selection' : 'Available Products'}
                   </Typography>
                   <Typography variant="body2" color="text.secondary" gutterBottom>
                     {(newKiosk.type === 'specialty' || newKiosk.type === 'mixed')
-                      ? 'Choose the default recipe for this kiosk. (Available recipes are managed in Application Recipes section)' 
+                      ? 'Choose the desired recipes to be viewed.' 
                       : 'Select which products should be available on this kiosk:'}
                   </Typography>
                   
@@ -961,6 +961,32 @@ const AdminPanel: React.FC = () => {
                             </Typography>
                             {availableForKiosk.map((application) => {
                               const isEnabled = newKiosk.availableApplications?.includes(application.id) || false;
+                              
+                              // Color based on application category
+                              const getCategoryColor = () => {
+                                if (application.applicationCategory === 'trees') {
+                                  return {
+                                    borderColor: isEnabled ? '#2e7d32' : '#4caf50', // Green shades for trees
+                                    bgcolor: isEnabled ? '#e8f5e8' : 'background.paper',
+                                    categoryColor: '#2e7d32'
+                                  };
+                                } else if (application.applicationCategory === 'other') {
+                                  return {
+                                    borderColor: isEnabled ? '#1976d2' : '#2196f3', // Blue shades for other
+                                    bgcolor: isEnabled ? '#e3f2fd' : 'background.paper',
+                                    categoryColor: '#1976d2'
+                                  };
+                                }
+                                // Default fallback
+                                return {
+                                  borderColor: isEnabled ? 'primary.main' : 'grey.300',
+                                  bgcolor: isEnabled ? 'primary.light' : 'background.paper',
+                                  categoryColor: 'text.secondary'
+                                };
+                              };
+                              
+                              const categoryColors = getCategoryColor();
+                              
                               return (
                                 <Box 
                                   key={application.id} 
@@ -969,36 +995,60 @@ const AdminPanel: React.FC = () => {
                                     alignItems: 'center', 
                                     py: 1,
                                     px: 2,
-                                    border: '1px solid',
-                                    borderColor: 'grey.300',
+                                    border: '2px solid',
+                                    borderColor: categoryColors.borderColor,
                                     borderRadius: 1,
                                     mb: 1,
-                                    bgcolor: 'background.paper'
+                                    bgcolor: categoryColors.bgcolor,
+                                    cursor: 'pointer',
+                                    '&:hover': {
+                                      bgcolor: isEnabled ? categoryColors.bgcolor : 'grey.50'
+                                    }
+                                  }}
+                                  onClick={() => {
+                                    const checked = !isEnabled;
+                                    console.log('� Application Box clicked!', application.name);
+                                    console.log(`  └─ Toggling '${application.id}' from ${isEnabled} to ${checked}`);
+                                    
+                                    setNewKiosk(prevKiosk => {
+                                      const currentApplications = prevKiosk.availableApplications || [];
+                                      const updatedApplications = checked
+                                        ? [...currentApplications, application.id]
+                                        : currentApplications.filter(id => id !== application.id);
+                                      
+                                      console.log(`  └─ New applications: ${JSON.stringify(updatedApplications)}`);
+                                      console.log(`  └─ Updated newKiosk`);
+                                      
+                                      return {
+                                        ...prevKiosk,
+                                        availableApplications: updatedApplications
+                                      };
+                                    });
                                   }}
                                 >
                                   <Checkbox
                                     checked={isEnabled}
-                                    onChange={(e) => {
-                                      const checked = e.target.checked;
-                                      console.log('📝 Checkbox clicked for application:', application.name, 'New state:', checked);
-                                      setNewKiosk(prevKiosk => {
-                                        const currentApplications = prevKiosk.availableApplications || [];
-                                        const updatedApplications = checked
-                                          ? [...currentApplications, application.id]
-                                          : currentApplications.filter(id => id !== application.id);
-                                        
-                                        return {
-                                          ...prevKiosk,
-                                          availableApplications: updatedApplications
-                                        };
-                                      });
-                                    }}
+                                    readOnly
                                     color="primary"
+                                    sx={{ pointerEvents: 'none' }}
                                   />
                                   <Box sx={{ flexGrow: 1, ml: 1 }}>
-                                    <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-                                      {application.name}
-                                    </Typography>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                                      <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                                        {application.name}
+                                      </Typography>
+                                      <Chip 
+                                        label={application.applicationCategory === 'trees' ? '🌳 Trees' : '⚡ Other'}
+                                        size="small"
+                                        sx={{ 
+                                          fontSize: '0.7rem',
+                                          height: 20,
+                                          bgcolor: categoryColors.categoryColor,
+                                          color: 'white',
+                                          fontWeight: 'bold'
+                                        }}
+                                      />
+                                    </Box>
                                     <Typography variant="caption" color="text.secondary">
                                       {application.description || 'No description'}
                                     </Typography>
