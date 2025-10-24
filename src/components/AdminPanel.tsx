@@ -48,6 +48,20 @@ const AdminPanel: React.FC = () => {
   const [applications, setApplications] = useState<any[]>([]);
   const [message, setMessage] = useState('');
   
+  // Helper function to get user-friendly kiosk type names
+  const getKioskTypeDisplayName = (type: string) => {
+    switch (type) {
+      case 'specialty':
+        return 'Standard';
+      case 'mixed':
+        return 'Mixed';
+      case 'fertilizer':
+        return 'Fertilizer';
+      default:
+        return type;
+    }
+  };
+  
   // Log messages to console instead of showing UI notifications
 
   
@@ -348,6 +362,7 @@ const AdminPanel: React.FC = () => {
       
       console.log('💾 SAVING KIOSK - Current newKiosk state:', JSON.stringify(newKiosk, null, 2));
       console.log('📦 Products being saved:', newKiosk.availableProducts);
+      console.log('📋 Applications being saved:', newKiosk.availableApplications);
       
       if (editingKiosk) {
         // Update existing kiosk in Firestore
@@ -357,13 +372,29 @@ const AdminPanel: React.FC = () => {
           updatedAt: new Date().toISOString()
         };
         
+        // Remove undefined values (Firestore doesn't support them)
+        Object.keys(kioskToSave).forEach(key => {
+          if (kioskToSave[key] === undefined) {
+            delete kioskToSave[key];
+          }
+        });
+        
         console.log('✏️ UPDATING kiosk:', kioskToSave.id);
         console.log('📦 Final products to save:', kioskToSave.availableProducts);
+        console.log('📋 Final applications to save:', kioskToSave.availableApplications);
         console.log('⭐ Default application ID to save:', kioskToSave.defaultApplicationId);
         
         // Save to Firestore using the kiosk ID as document ID
         await setDoc(doc(db, 'kiosks', editingKiosk.id), kioskToSave, { merge: true });
-        setMessage(`Kiosk "${kioskToSave.name}" updated successfully! Default recipe saved.`);
+        
+        // Dynamic success message based on kiosk type
+        let successMessage = `Kiosk "${kioskToSave.name}" updated successfully!`;
+        if (kioskToSave.type === 'specialty' && kioskToSave.defaultApplicationId) {
+          successMessage += ` Default recipe set.`;
+        } else if (kioskToSave.type === 'mixed' && kioskToSave.availableApplications?.length > 0) {
+          successMessage += ` ${kioskToSave.availableApplications.length} recipes available.`;
+        }
+        setMessage(successMessage);
         
         console.log('✅ Updated kiosk in Firestore:', kioskToSave);
         console.log('📦 Selected products:', kioskToSave.availableProducts);
@@ -374,6 +405,13 @@ const AdminPanel: React.FC = () => {
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         };
+        
+        // Remove undefined values (Firestore doesn't support them)
+        Object.keys(kioskToSave).forEach(key => {
+          if (kioskToSave[key] === undefined) {
+            delete kioskToSave[key];
+          }
+        });
         
         console.log('➕ CREATING new kiosk');
         console.log('📦 Final products to save:', kioskToSave.availableProducts);
@@ -403,8 +441,9 @@ const AdminPanel: React.FC = () => {
       });
       loadKiosks();
     } catch (error) {
-      console.error('Error saving kiosk:', error);
-      setMessage('Error saving kiosk. Check Firestore permissions.');
+      console.error('❌ Error saving kiosk:', error);
+      console.error('📋 Kiosk data that failed to save:', JSON.stringify(newKiosk, null, 2));
+      setMessage(`Error saving kiosk: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
@@ -525,8 +564,13 @@ const AdminPanel: React.FC = () => {
     console.log('📦 Total products available:', products.length);
     
     if (newKiosk.type === 'fertilizer') {
-      const filtered = products.filter(p => p.category === 'fertilizer');
+      const filtered = products.filter(p => 
+        p.type === 'fertilizer' && 
+        p.availableForDryFertKiosk === true && 
+        p.isActive !== false
+      );
       console.log('✅ Filtered fertilizer products:', filtered.length);
+      console.log('📋 Products with availableForDryFertKiosk=true:', products.filter(p => p.availableForDryFertKiosk === true).map(p => p.name));
       return filtered;
     } else if (newKiosk.type === 'specialty') {
       const filtered = products.filter(p => 
@@ -692,8 +736,7 @@ const AdminPanel: React.FC = () => {
                             )}
                           </Typography>
                           <Typography variant="body2" color="text.secondary" gutterBottom>
-                            Type: {kiosk.type} • 
-                            Products: {kiosk.availableProducts?.length || 0} • 
+                            Type: {getKioskTypeDisplayName(kiosk.type)} • 
                             Location: {kiosk.location || 'Not specified'}
                           </Typography>
                           <Typography variant="body2">
@@ -966,8 +1009,84 @@ const AdminPanel: React.FC = () => {
                           </>
                         );
                       })()
+                    ) : newKiosk.type === 'fertilizer' ? (
+                      // Dry Fertilizer Kiosk: Multiple fertilizer product selection (checkboxes)
+                      (() => {
+                        const availableForKiosk = filteredProducts; // Already filtered to fertilizer products
+                        
+                        return availableForKiosk.length === 0 ? (
+                          <Box sx={{ p: 2, textAlign: 'center' }}>
+                            <Typography color="text.secondary" gutterBottom>
+                              No fertilizer products are available.
+                            </Typography>
+                            <Typography variant="caption" color="info.main">
+                              Add fertilizer products to the catalog first.
+                            </Typography>
+                          </Box>
+                        ) : (
+                          <>
+                            <Typography variant="caption" color="info.main" sx={{ mb: 2, display: 'block', fontWeight: 'bold' }}>
+                              🌾 Select fertilizer products to be available on this kiosk. Users can choose from these options.
+                            </Typography>
+                            {availableForKiosk.map((product) => {
+                              const isEnabled = newKiosk.availableProducts?.includes(product.id) || false;
+                              return (
+                                <Box 
+                                  key={product.id} 
+                                  sx={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    py: 1,
+                                    px: 2,
+                                    border: '1px solid',
+                                    borderColor: 'grey.300',
+                                    borderRadius: 1,
+                                    mb: 1,
+                                    bgcolor: 'background.paper',
+                                    cursor: 'pointer'
+                                  }}
+                                  onClick={() => {
+                                    console.log('� Product box clicked - toggling:', product.name);
+                                    const isCurrentlyEnabled = newKiosk.availableProducts?.includes(product.id) || false;
+                                    const newValue = !isCurrentlyEnabled;
+                                    console.log('📝 Toggling from', isCurrentlyEnabled, 'to', newValue);
+                                    
+                                    setNewKiosk(prevKiosk => {
+                                      const currentProducts = prevKiosk.availableProducts || [];
+                                      const updatedProducts = newValue
+                                        ? [...currentProducts, product.id]
+                                        : currentProducts.filter(id => id !== product.id);
+                                      
+                                      console.log('📝 Updated products list:', updatedProducts);
+                                      return {
+                                        ...prevKiosk,
+                                        availableProducts: updatedProducts
+                                      };
+                                    });
+                                  }}
+                                >
+                                  <Checkbox
+                                    checked={isEnabled}
+                                    onChange={() => {}} // Disabled - using box click instead
+                                    color="primary"
+                                    sx={{ pointerEvents: 'none' }} // Make checkbox non-interactive
+                                  />
+                                  <Box sx={{ flexGrow: 1, ml: 1 }}>
+                                    <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                                      {product.name}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                      Category: {product.category} • Type: {product.type}
+                                    </Typography>
+                                  </Box>
+                                </Box>
+                              );
+                            })}
+                          </>
+                        );
+                      })()
                     ) : (
-                      // Show products for fertilizer and other kiosk types
+                      // Show products for other kiosk types (fallback)
                     products.length === 0 ? (
                       <Typography color="text.secondary">No products available. Please add products first.</Typography>
                     ) : (

@@ -63,6 +63,8 @@ interface Product {
   // Granular/Fertilizer product properties
   poundsPer1000SqFt?: number; // Application rate in pounds per 1000 square feet
   poundsPerBag?: number; // Weight of each bag in pounds
+  // Kiosk availability
+  availableForDryFertKiosk?: boolean; // Whether this product is available on the Dry Fertilizer kiosk
   unit: string; // e.g., "lbs", "oz", "pints"
   description?: string;
   isActive: boolean;
@@ -87,10 +89,34 @@ const ProductManagement: React.FC = () => {
     trailerRatePerGallon: 0,
     poundsPer1000SqFt: 0,
     poundsPerBag: 50,
+    availableForDryFertKiosk: false,
     unit: '',
     description: '',
     isActive: true
   });
+
+  // Helper function to extract application rate from description or use poundsPer1000SqFt field
+  const getApplicationRate = (product: Product): string => {
+    // First try to use the dedicated field
+    if (product.poundsPer1000SqFt && product.poundsPer1000SqFt > 0) {
+      return product.poundsPer1000SqFt.toString();
+    }
+    
+    // Fallback: try to extract from description
+    if (product.description) {
+      const rateMatch = product.description.match(/(\d+(?:\.\d+)?)\s*(?:lbs?|pounds?)\s*(?:per|\/)\s*1000/i);
+      if (rateMatch) {
+        return rateMatch[1];
+      }
+    }
+    
+    return 'N/A';
+  };
+
+  // Helper function to check if product is available for dry fertilizer kiosk
+  const isDryFertAvailable = (product: Product): boolean => {
+    return product.availableForDryFertKiosk === true;
+  };
 
   useEffect(() => {
     loadProducts();
@@ -164,6 +190,7 @@ const ProductManagement: React.FC = () => {
         trailerRatePerGallon: 0,
         poundsPer1000SqFt: 0,
         poundsPerBag: 50,
+        availableForDryFertKiosk: false,
         unit: '', 
         description: '', 
         isActive: true 
@@ -209,7 +236,8 @@ const ProductManagement: React.FC = () => {
         poundsPerBag: editingProduct.poundsPerBag || 50,
         unit: editingProduct.unit,
         description: editingProduct.description || '',
-        isActive: editingProduct.isActive
+        isActive: editingProduct.isActive,
+        availableForDryFertKiosk: editingProduct.availableForDryFertKiosk || false
       });
       console.log('Product updated successfully');
       setMessage('Product updated successfully!');
@@ -442,6 +470,7 @@ const ProductManagement: React.FC = () => {
                     <TableCell>Cart Rate</TableCell>
                     <TableCell>Backpack Rate</TableCell>
                     <TableCell>Trailer Rate</TableCell>
+                    <TableCell>Application Rate</TableCell>
                     <TableCell>Unit</TableCell>
                     <TableCell>Status</TableCell>
                     <TableCell>Actions</TableCell>
@@ -502,6 +531,11 @@ const ProductManagement: React.FC = () => {
                           ? product.trailerRatePerGallon 
                           : 'N/A'
                         }
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" color={product.poundsPer1000SqFt ? 'text.primary' : 'text.secondary'}>
+                          {getApplicationRate(product)}
+                        </Typography>
                       </TableCell>
                       <TableCell>{product.unit}</TableCell>
                       <TableCell>
@@ -575,10 +609,27 @@ const ProductManagement: React.FC = () => {
                 value={editingProduct ? editingProduct.type : newProduct.type}
                 label="Product Type"
                 onChange={(e) => {
+                  const newType = e.target.value as any;
+                  console.log('🔄 Product type changing to:', newType);
+                  
                   if (editingProduct) {
-                    setEditingProduct({ ...editingProduct, type: e.target.value as any });
+                    const updatedProduct = { 
+                      ...editingProduct, 
+                      type: newType,
+                      // Clear dry fert kiosk availability if changing away from fertilizer
+                      ...(newType !== 'fertilizer' && { availableForDryFertKiosk: false })
+                    };
+                    console.log('✏️ Updating editingProduct:', updatedProduct);
+                    setEditingProduct(updatedProduct);
                   } else {
-                    setNewProduct({ ...newProduct, type: e.target.value as any });
+                    const updatedProduct = { 
+                      ...newProduct, 
+                      type: newType,
+                      // Clear dry fert kiosk availability if changing away from fertilizer
+                      ...(newType !== 'fertilizer' && { availableForDryFertKiosk: false })
+                    };
+                    console.log('➕ Updating newProduct:', updatedProduct);
+                    setNewProduct(updatedProduct);
                   }
                 }}
               >
@@ -591,6 +642,40 @@ const ProductManagement: React.FC = () => {
                 <MenuItem value="other">Other</MenuItem>
               </Select>
             </FormControl>
+
+            {/* Dry Fertilizer Kiosk Availability */}
+            {(editingProduct ? editingProduct.type : newProduct.type) === 'fertilizer' && (
+              <Box sx={{ mb: 2, p: 2, border: '1px solid', borderColor: 'primary.main', borderRadius: 1, bgcolor: 'primary.50' }}>
+                <Typography variant="subtitle2" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                  🌾 Dry Fertilizer Kiosk Availability
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                  <Button
+                    variant={(editingProduct?.availableForDryFertKiosk || newProduct.availableForDryFertKiosk) ? "contained" : "outlined"}
+                    color={(editingProduct?.availableForDryFertKiosk || newProduct.availableForDryFertKiosk) ? "success" : "primary"}
+                    onClick={() => {
+                      const isCurrentlyAvailable = editingProduct?.availableForDryFertKiosk || newProduct.availableForDryFertKiosk;
+                      const newValue = !isCurrentlyAvailable;
+                      
+                      if (editingProduct) {
+                        setEditingProduct({ ...editingProduct, availableForDryFertKiosk: newValue });
+                      } else {
+                        setNewProduct({ ...newProduct, availableForDryFertKiosk: newValue });
+                      }
+                    }}
+                    startIcon={(editingProduct?.availableForDryFertKiosk || newProduct.availableForDryFertKiosk) ? '✅' : '➕'}
+                    sx={{ minWidth: 180 }}
+                  >
+                    {(editingProduct?.availableForDryFertKiosk || newProduct.availableForDryFertKiosk) ? 'Enabled for Kiosk' : 'Enable for Kiosk'}
+                  </Button>
+                </Box>
+                <Typography variant="caption" color="text.secondary">
+                  {(editingProduct?.availableForDryFertKiosk || newProduct.availableForDryFertKiosk) 
+                    ? 'This fertilizer will appear on the Dry Fertilizer kiosk for users to select.' 
+                    : 'Click to make this fertilizer available on the Dry Fertilizer kiosk.'}
+                </Typography>
+              </Box>
+            )}
 
             <TextField
               margin="dense"
@@ -676,7 +761,7 @@ const ProductManagement: React.FC = () => {
 
             <TextField
               margin="dense"
-              label="Pounds per 1000 Sq Ft (Fertilizer)"
+              label="Application Rate (lbs per 1000 sq ft)"
               type="number"
               fullWidth
               variant="outlined"
