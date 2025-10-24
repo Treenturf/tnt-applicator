@@ -33,7 +33,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { useKiosk } from '../contexts/KioskContext';
 import { useNavigate } from 'react-router-dom';
-import { collection, getDocs, addDoc, updateDoc, setDoc, doc, deleteDoc, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs, addDoc, updateDoc, setDoc, doc, deleteDoc, onSnapshot, writeBatch } from 'firebase/firestore';
 import { db } from '../firebase';
 
 const AdminPanel: React.FC = () => {
@@ -163,13 +163,6 @@ const AdminPanel: React.FC = () => {
       icon: <Typography sx={{ fontSize: 40 }}>📊</Typography>,
       action: () => navigate('/reports'),
       color: 'info.main'
-    },
-    {
-      title: 'Debug Database',
-      description: 'Debug activity logs and data issues',
-      icon: <Typography sx={{ fontSize: 40 }}>🔍</Typography>,
-      action: () => navigate('/debug'),
-      color: 'warning.main'
     }
   ];
 
@@ -624,6 +617,100 @@ const AdminPanel: React.FC = () => {
     }
   };
 
+  // Helper function to migrate legacy product data (add equipmentTypes if missing)
+  const migrateLegacyProduct = (product: any) => {
+    let equipmentTypes: ('hose-truck' | 'trailer' | 'cart-truck' | 'backpack')[] = [];
+    
+    if (!product.equipmentTypes) {
+      // For legacy products, convert old truckTypes to new equipmentTypes
+      if (product.truckTypes) {
+        // Migrate from old truckTypes format
+        if (product.truckTypes.includes('hose')) {
+          equipmentTypes.push('hose-truck', 'trailer');
+        }
+        if (product.truckTypes.includes('cart')) {
+          equipmentTypes.push('cart-truck', 'backpack');
+        }
+      } else {
+        // Very old products without truckTypes - use rates
+        if (product.hoseRate > 0) {
+          equipmentTypes.push('hose-truck', 'trailer');
+        }
+        if (product.cartRate > 0) {
+          equipmentTypes.push('cart-truck', 'backpack');
+        }
+      }
+      
+      if (equipmentTypes.length === 0) {
+        equipmentTypes = ['cart-truck', 'backpack'];
+      }
+    } else {
+      equipmentTypes = [...product.equipmentTypes];
+    }
+
+    // Clean up equipment types - remove those without valid rates
+    const validEquipmentTypes = equipmentTypes.filter(equipType => {
+      switch (equipType) {
+        case 'hose-truck':
+          return product.hoseRate && product.hoseRate > 0;
+        case 'trailer':
+          return product.trailerRate && product.trailerRate > 0;
+        case 'cart-truck':
+          return product.cartRate && product.cartRate > 0;
+        case 'backpack':
+          return product.backpackRate && product.backpackRate > 0;
+        default:
+          return false;
+      }
+    });
+    
+    return {
+      ...product,
+      equipmentTypes: validEquipmentTypes.length > 0 ? validEquipmentTypes : ['cart-truck']
+    };
+  };
+
+  // Function to clean up all applications - remove invalid equipment types
+  const cleanupAllApplications = async () => {
+    if (!window.confirm('This will clean up all applications by removing invalid equipment types from products. Continue?')) {
+      return;
+    }
+
+    try {
+      const querySnapshot = await getDocs(collection(db, 'applications'));
+      const batch = writeBatch(db);
+      let updatedCount = 0;
+
+      querySnapshot.docs.forEach((document) => {
+        const application = document.data();
+        if (application.products && application.products.length > 0) {
+          const cleanedProducts = application.products.map(product => migrateLegacyProduct(product));
+          
+          // Check if any changes were made
+          const hasChanges = JSON.stringify(application.products) !== JSON.stringify(cleanedProducts);
+          
+          if (hasChanges) {
+            batch.update(doc(db, 'applications', document.id), {
+              products: cleanedProducts,
+              updatedAt: new Date()
+            });
+            updatedCount++;
+          }
+        }
+      });
+
+      if (updatedCount > 0) {
+        await batch.commit();
+        setMessage(`Cleaned up ${updatedCount} applications successfully!`);
+      } else {
+        setMessage('No applications needed cleanup.');
+      }
+    } catch (error) {
+      console.error('Error cleaning up applications:', error);
+      setMessage('Error cleaning up applications: ' + (error as Error).message);
+    }
+  };
+
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <AppBar position="static" sx={{ bgcolor: 'primary.main', mb: 4 }}>
@@ -695,6 +782,63 @@ const AdminPanel: React.FC = () => {
             </Card>
           </Grid>
         ))}
+      </Grid>
+
+      {/* Debug Tools Card with Cleanup */}
+      <Grid container spacing={4} justifyContent="center" sx={{ mb: 4 }}>
+        <Grid item xs={12} sm={6} md={4}>
+          <Card
+            sx={{
+              height: '250px',
+              display: 'flex',
+              flexDirection: 'column',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: 4
+              }
+            }}
+          >
+            <CardContent sx={{ flexGrow: 1, textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+              <Box>
+                <Box sx={{ mb: 2 }}>
+                  <Typography sx={{ fontSize: 40 }}>🔧</Typography>
+                </Box>
+                <Typography variant="h6" component="h3" gutterBottom sx={{ fontWeight: 'bold' }}>
+                  Debug Tools
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Advanced debugging and data cleanup tools
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <Button 
+                  variant="outlined" 
+                  onClick={() => navigate('/debug')}
+                  sx={{ 
+                    color: 'warning.main',
+                    borderColor: 'warning.main',
+                    '&:hover': { 
+                      bgcolor: 'warning.light',
+                      color: 'white'
+                    }
+                  }}
+                >
+                  View Debug Logs
+                </Button>
+                <Button 
+                  variant="contained" 
+                  color="warning"
+                  onClick={cleanupAllApplications}
+                  size="small"
+                  title="Clean up all applications by removing invalid equipment types"
+                >
+                  🔧 Cleanup Recipe Data
+                </Button>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
       </Grid>
 
       {/* Kiosk Management Dialog */}

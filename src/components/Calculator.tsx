@@ -415,8 +415,14 @@ const Calculator: React.FC = () => {
       // Hose truck: calculate for both tanks separately for each product
       if (frontTank <= 0 && backTank <= 0) return;
       
-      // Calculate for each product in the application recipe
-      applicationToUse.products.forEach((appProduct: any) => {
+      // Filter products for hose truck compatibility and calculate for each
+      const hoseCompatibleProducts = applicationToUse.products.filter((appProduct: any) => {
+        // Check if product supports hose-truck equipment type
+        const equipmentTypes = appProduct.equipmentTypes || appProduct.truckTypes || [];
+        return equipmentTypes.includes('hose-truck') || equipmentTypes.includes('hose');
+      });
+      
+      hoseCompatibleProducts.forEach((appProduct: any) => {
         const rate = appProduct.hoseRate || 0;
         const frontTankOunces = frontTank * rate;
         const backTankOunces = backTank * rate;
@@ -447,8 +453,14 @@ const Calculator: React.FC = () => {
       // Cart truck: Dual tank calculation (driver and passenger tanks)
       if (frontTank <= 0 && backTank <= 0) return;
       
-      // Calculate for each product in the application recipe
-      applicationToUse.products.forEach((appProduct: any) => {
+      // Filter products for cart truck compatibility and calculate for each
+      const cartCompatibleProducts = applicationToUse.products.filter((appProduct: any) => {
+        // Check if product supports cart-truck equipment type
+        const equipmentTypes = appProduct.equipmentTypes || appProduct.truckTypes || [];
+        return equipmentTypes.includes('cart-truck') || equipmentTypes.includes('cart');
+      });
+      
+      cartCompatibleProducts.forEach((appProduct: any) => {
         const rate = appProduct.cartRate || 0;
         const driverTankOunces = frontTank * rate;
         const passengerTankOunces = backTank * rate;
@@ -1109,9 +1121,39 @@ const Calculator: React.FC = () => {
                       {mode === 'application' ? 'Application Mix Requirements' : mode === 'tnt' ? 'TNT Mix Requirements' : 'Fertilizer Requirements'}
                     </Typography>
 
-                    {calculations.map((calc, index) => (
-                      <Box key={index} sx={{ mb: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                        <Typography variant="h6" gutterBottom>
+                    {calculations.map((calc, index) => {
+                      // Create distinct colors for each product in the calculation
+                      const productColors = [
+                        { main: '#1976d2', light: '#e3f2fd', dark: '#0d47a1' }, // Blue
+                        { main: '#388e3c', light: '#e8f5e9', dark: '#1b5e20' }, // Green
+                        { main: '#f57c00', light: '#fff3e0', dark: '#e65100' }, // Orange
+                        { main: '#7b1fa2', light: '#f3e5f5', dark: '#4a148c' }, // Purple
+                        { main: '#d32f2f', light: '#ffebee', dark: '#b71c1c' }, // Red
+                        { main: '#455a64', light: '#eceff1', dark: '#263238' }, // Blue Grey
+                        { main: '#00796b', light: '#e0f2f1', dark: '#004d40' }, // Teal
+                        { main: '#5d4037', light: '#efebe9', dark: '#3e2723' }, // Brown
+                      ];
+                      const productColor = productColors[index % productColors.length];
+                      
+                      return (
+                      <Box 
+                        key={index} 
+                        sx={{ 
+                          mb: 2, 
+                          p: 2, 
+                          bgcolor: productColor.light, 
+                          borderRadius: 1,
+                          border: `2px solid ${productColor.main}`
+                        }}
+                      >
+                        <Typography 
+                          variant="h6" 
+                          gutterBottom 
+                          sx={{ 
+                            fontWeight: 'bold',
+                            color: productColor.dark 
+                          }}
+                        >
                           {calc.product.name}
                         </Typography>
                         {mode === 'fertilizer' ? (
@@ -1119,7 +1161,14 @@ const Calculator: React.FC = () => {
                             <Typography variant="body1">
                               Area: {calc.squareFeet?.toLocaleString()} sq ft
                             </Typography>
-                            <Typography variant="h3" sx={{ my: 1, fontWeight: 'bold', color: themeColor || '#0288d1' }}>
+                            <Typography 
+                              variant="h3" 
+                              sx={{ 
+                                my: 1, 
+                                fontWeight: 'bold', 
+                                color: productColor.dark 
+                              }}
+                            >
                               {calc.totalBags} bags needed
                             </Typography>
                             <Typography variant="h6">
@@ -1131,26 +1180,20 @@ const Calculator: React.FC = () => {
                             {calc.tankSelection === 'hose' && (
                               <>
                                 <Typography variant="body1">
-                                  Front Tank: {calc.frontTankGallons} gallons = <strong>{calc.frontTankOunces?.toFixed(2)} {calc.product.unit}</strong>
+                                  Front Tank: {calc.frontTankGallons} gallons = <strong style={{ color: productColor.dark }}>{calc.frontTankOunces?.toFixed(2)} {calc.product.unit}</strong>
                                 </Typography>
                                 <Typography variant="body1">
-                                  Back Tank: {calc.backTankGallons} gallons = <strong>{calc.backTankOunces?.toFixed(2)} {calc.product.unit}</strong>
-                                </Typography>
-                                <Typography variant="h5" sx={{ mt: 1, fontWeight: 'bold', color: themeColor }}>
-                                  Total: {calc.ouncesNeeded?.toFixed(2)} {calc.product.unit}
+                                  Back Tank: {calc.backTankGallons} gallons = <strong style={{ color: productColor.dark }}>{calc.backTankOunces?.toFixed(2)} {calc.product.unit}</strong>
                                 </Typography>
                               </>
                             )}
                             {calc.tankSelection === 'cart' && (
                               <>
                                 <Typography variant="body1">
-                                  Driver Tank: {calc.frontTankGallons} gallons = <strong>{calc.frontTankOunces?.toFixed(2)} {calc.product.unit}</strong>
+                                  Driver Tank: {calc.frontTankGallons} gallons = <strong style={{ color: productColor.dark }}>{calc.frontTankOunces?.toFixed(2)} {calc.product.unit}</strong>
                                 </Typography>
                                 <Typography variant="body1">
-                                  Passenger Tank: {calc.backTankGallons} gallons = <strong>{calc.backTankOunces?.toFixed(2)} {calc.product.unit}</strong>
-                                </Typography>
-                                <Typography variant="h5" sx={{ mt: 1, fontWeight: 'bold', color: themeColor }}>
-                                  Total: {calc.ouncesNeeded?.toFixed(2)} {calc.product.unit}
+                                  Passenger Tank: {calc.backTankGallons} gallons = <strong style={{ color: productColor.dark }}>{calc.backTankOunces?.toFixed(2)} {calc.product.unit}</strong>
                                 </Typography>
                               </>
                             )}
@@ -1159,7 +1202,14 @@ const Calculator: React.FC = () => {
                                 <Typography variant="body1">
                                   Tank: {calc.frontTankGallons} gallons
                                 </Typography>
-                                <Typography variant="h5" sx={{ mt: 1, fontWeight: 'bold', color: themeColor }}>
+                                <Typography 
+                                  variant="h5" 
+                                  sx={{ 
+                                    mt: 1, 
+                                    fontWeight: 'bold', 
+                                    color: productColor.dark 
+                                  }}
+                                >
                                   {calc.ouncesNeeded?.toFixed(2)} {calc.product.unit} needed
                                 </Typography>
                               </>
@@ -1167,7 +1217,8 @@ const Calculator: React.FC = () => {
                           </>
                         )}
                       </Box>
-                    ))}
+                      );
+                    })}
 
                     <Button 
                       fullWidth 

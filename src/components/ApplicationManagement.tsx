@@ -61,8 +61,7 @@ import {
   addDoc, 
   updateDoc, 
   deleteDoc, 
-  doc,
-  writeBatch
+  doc
 } from 'firebase/firestore';
 
 // Application interface
@@ -487,48 +486,6 @@ const ApplicationManagement: React.FC = () => {
     }
   };
 
-  // Function to clean up all applications - remove invalid equipment types
-  const cleanupAllApplications = async () => {
-    if (!window.confirm('This will clean up all applications by removing invalid equipment types from products. Continue?')) {
-      return;
-    }
-
-    try {
-      const querySnapshot = await getDocs(collection(db, 'applications'));
-      const batch = writeBatch(db);
-      let updatedCount = 0;
-
-      querySnapshot.docs.forEach((document) => {
-        const application = document.data() as Application;
-        if (application.products && application.products.length > 0) {
-          const cleanedProducts = application.products.map(product => migrateLegacyProduct(product));
-          
-          // Check if any changes were made
-          const hasChanges = JSON.stringify(application.products) !== JSON.stringify(cleanedProducts);
-          
-          if (hasChanges) {
-            batch.update(doc(db, 'applications', document.id), {
-              products: cleanedProducts,
-              updatedAt: new Date()
-            });
-            updatedCount++;
-          }
-        }
-      });
-
-      if (updatedCount > 0) {
-        await batch.commit();
-        setMessage(`Cleaned up ${updatedCount} applications successfully!`);
-        loadApplications();
-      } else {
-        setMessage('No applications needed cleanup.');
-      }
-    } catch (error) {
-      console.error('Error cleaning up applications:', error);
-      setMessage('Error cleaning up applications: ' + (error as Error).message);
-    }
-  };
-
   const openAddDialog = () => {
     console.log('🔧 Opening add application dialog...');
     setEditingApplication(null);
@@ -777,25 +734,16 @@ const ApplicationManagement: React.FC = () => {
 
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
           <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-            Application Recipes
+            Recipes
           </Typography>
           <Box sx={{ display: 'flex', gap: 2 }}>
-            <Button 
-              variant="outlined" 
-              color="warning"
-              onClick={cleanupAllApplications}
-              size="medium"
-              title="Clean up all applications by removing invalid equipment types"
-            >
-              🔧 Cleanup Data
-            </Button>
             <Button 
               variant="contained" 
               startIcon={<AddIcon />}
               onClick={openAddDialog}
               size="large"
             >
-              Create New Application
+              Create New Recipe
             </Button>
           </Box>
         </Box>
